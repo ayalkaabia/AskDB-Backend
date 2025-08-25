@@ -1,4 +1,4 @@
-Business Requirements Document (BRD)
+﻿Business Requirements Document (BRD)
 Project: Dell – Tsofen Data Exploration Interface
 Executive Summary
 This project aims to build a natural language interface for exploring and analyzing data. The system enables users to interact with databases through conversational prompts, eliminating the need for SQL knowledge or reliance on database administrators. It is designed to simplify data exploration across Dell products, enhance productivity, and enable faster decision-making.
