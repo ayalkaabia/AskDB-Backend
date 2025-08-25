@@ -2,7 +2,7 @@
 
 **Project Name:** Dell – Tsofen Data Exploration Assistant  
 **Version:** 1.0  
-**Authors:** Omar Ryyan & 
+**Authors:** Omar Ryyan & Ayal Kaabia & Soha Hassan & Haya Gharra
 **Date:** 25/08/2025  
 
 ---
@@ -108,7 +108,7 @@ Exploring data in relational databases often requires SQL expertise or waiting f
 - **Dependencies:** Reliance on GPT/OpenAI API (availability, pricing).  
 - **Security Risks:** Potential SQL injection if not validated properly.  
 - **Complexity Limits:** Very complex queries (nested joins, advanced analytics) may not be translated correctly.  
-- **Timeline/Resources:** [To be defined by team].  
+- **Timeline/Resources:** To be determined.  
 
 ---
 
