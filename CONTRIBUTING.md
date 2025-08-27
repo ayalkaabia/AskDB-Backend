@@ -34,7 +34,7 @@ npm install
 Create a `.env` file in the root directory:
 
 ```bash
-OPENAI_API_KEY=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
+OPENAI_API_KEY=we are given
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
