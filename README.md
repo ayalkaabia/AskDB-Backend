@@ -15,35 +15,43 @@ Maintain a history of past prompts and queries.
 Offer examples and tooltips to guide users.
 Optional enhancements such as live auto‑suggestions, SQL explanations and chat‑style interaction.
 Prerequisites
-Python 3.8+ – The reference implementation uses Python. Ensure Python 3.8 or later is installed.
+Node.js 16+ and npm – The backend is built with Express and the frontend uses React. Ensure Node.js and the Node package manager (npm) are installed.
+MySQL Server – A running MySQL instance to store imported data and execute queries. Create a database and a user with the necessary privileges.
 OpenAI API key – The system relies on the OpenAI API for natural‑language processing. Set an environment variable OPENAI_API_KEY with your API key.
-pip – Python package installer to install dependencies.
 Installation
 Clone the repository:
 git clone https://github.com/your‑organisation/dell‑tsofen‑nl‑sql.git
 cd dell‑tsofen‑nl‑sql
-Create and activate a virtual environment (optional but recommended):
-python3 -m venv venv
-source venv/bin/activate
-Install required packages:
-pip install -r requirements.txt
-Export your OpenAI API key (replace your-key accordingly):
-export OPENAI_API_KEY=your-key
+Configure environment variables:
+Create a file named .env in the project root and define your MySQL and OpenAI credentials:
+OPENAI_API_KEY=your-openai-api-key
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_DATABASE=your_database
+MYSQL_USER=your_user
+MYSQL_PASSWORD=your_password
+Install backend dependencies:
+cd server
+npm install
+Install frontend dependencies:
+cd ../client
+npm install
+Build the frontend:
+npm run build
+Start the backend:
+cd ../server
+npm start
+The API will be available at http://localhost:8000/ by default.
+Serve the frontend: You can serve the built React application using any static file server. During development, you may run npm start inside the client directory to start a development server at http://localhost:3000/.
 Usage
-Prepare your data – Place your CSV or JSON file in the data/ directory, or identify an existing SQLite database you want to query.
-Run the application:
-python main.py --data-file data/your_file.csv
-Alternatively, provide a path to an existing database:
-python main.py --db-file path/to/database.db
-Interact via the CLI – Once started, the program will prompt you to enter natural‑language questions. Type your question and press Enter. The system will show a preview of the generated SQL; you can accept, edit or cancel the query. Results will then be displayed in a table. Use commands like history, export, help or exit to access additional functionality.
-Export results – After running a query, use the export command and specify the desired format (csv or json) to save the results.
+Prepare your data – Import your CSV or JSON data into the MySQL database configured above, or point the application to an existing database. The server component exposes endpoints to upload data and create tables automatically.
+Start both services – In separate terminals, run npm start in the server directory (to start the Express API) and npm start in the client directory (to start the React development server). Make sure the .env file is configured correctly.
+Interact via the web UI – Open http://localhost:3000/ in your browser. You can upload data, ask questions in natural language, view/edit the generated SQL, run queries and export results. Errors and history will be displayed in the interface.
 Project structure
-main.py – Entry point for the command‑line interface.
-nl2sql.py – Module responsible for prompt processing and SQL generation.
-db.py – Database management and validation functions.
-history.py – Stores and retrieves query history.
-requirements.txt – Python dependencies.
-README.md and readme.md – Project documentation.
+server/ – The Express backend. Contains route definitions (routes/), business logic (controllers/), database models (models/) and entry point (server.js).
+client/ – The React frontend. Contains components, pages, state management and assets.
+.env – Environment variables for database and API credentials.
+README.md – This document.
 Contributing
 Contributions are welcome! Please open issues or pull requests on GitHub. When contributing code, ensure it is well‑documented and accompanied by relevant tests.
 License
