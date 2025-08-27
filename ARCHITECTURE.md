@@ -1,6 +1,6 @@
 # NL→SQL Data Exploration Assistant — ARCHITECTURE.md
 
-> **Goal:** Let users explore relational data with natural language, safely and quickly, via a CLI (Linux terminal) and optional web UI. The system converts prompts to SQL, validates against the schema, safely executes queries, and returns clear tabular results with history, exports, and optional explanations.
+> **Goal:** Let users explore relational data with natural language, safely and quickly, via a **Web UI** (primary) and optional CLI (Linux terminal). The system converts prompts to SQL, validates against the schema, safely executes queries, and returns clear tabular results with history, exports, and optional explanations.
 
 ---
 
@@ -21,7 +21,7 @@
 * Return results as friendly tables; allow **export to CSV/JSON**.
 * Maintain **history** of prompts, generated SQL, and results.
 * Provide **tooltips/examples** and optional **SQL preview/edit**.
-* Linux terminal interface first; optional web UI.
+* **Web UI** as the main interface; optional Linux terminal CLI.
 
 **Secondary/Nice-to-haves**
 
@@ -41,8 +41,8 @@
 ```mermaid
 flowchart LR
   subgraph UI[User Interfaces]
-    TUI[CLI / TUI (Linux Terminal)]
-    WEB[Optional Web UI]
+    WEB[Web UI (Primary)]
+    TUI[CLI / TUI (Linux Terminal, optional)]
   end
 
   subgraph API[Orchestrator API]
@@ -66,8 +66,8 @@ flowchart LR
     LOGS[(Query Runs / History)]
   end
 
-  TUI -->|prompt| NLQ
   WEB -->|prompt| NLQ
+  TUI -->|prompt| NLQ
   NLQ --> SG
   NLQ --> PROMPT --> OPENAI
   OPENAI --> NLQ
@@ -76,8 +76,8 @@ flowchart LR
   QE --> DB
   SG <--> CACHE
   QE -->|results| HX
-  HX -->|download| TUI
   HX -->|download| WEB
+  HX -->|download| TUI
   ING --> DB
   SG --> ING
   NLQ --> EMB
@@ -94,22 +94,27 @@ flowchart LR
 
 ## 3) Component Responsibilities
 
-### 3.1 CLI / TUI (Linux Terminal)
+### 3.1 Web UI (Primary)
 
-* Single binary/script providing:
+* Browser-based application providing:
 
-  * Prompt input, history navigation, and optional auto-suggestions.
+  * Prompt input box with tooltips/examples.
   * **Result table** rendering; paging for large results.
-  * View/edit generated SQL before execution.
+  * SQL preview/edit before execution.
   * Export results to CSV/JSON.
-  * Load/select `.db` file or trigger ingestion (CSV/JSON → DB).
-  * Helpful tooltips and examples.
-* Optional chat-style mode with follow-ups referencing previous context.
+  * File upload for `.db` or ingestion from CSV/JSON.
+  * Maintain history with searchable log.
+  * Optional chat-style follow-up queries.
 
-### 3.2 Optional Web UI
+### 3.2 CLI / TUI (Linux Terminal, Optional)
 
-* Mirrors CLI features: prompt box, SQL preview/edit, results table, history.
-* File upload for `.db`; download exports.
+* Lightweight terminal client providing:
+
+  * Prompt input and history navigation.
+  * Table rendering in text.
+  * File selection for `.db`.
+  * Export to CSV/JSON.
+* Useful for developers or scripting.
 
 ### 3.3 Orchestrator API
 
@@ -142,7 +147,7 @@ flowchart LR
 ```mermaid
 sequenceDiagram
   actor U as User
-  participant UI as CLI/Web UI
+  participant WEB as Web UI
   participant NLQ as NL→SQL Orchestrator
   participant SG as Schema Service
   participant EMB as Embeddings Index
@@ -152,20 +157,20 @@ sequenceDiagram
   participant DB as Database
   participant HX as History
 
-  U->>UI: Enter prompt
-  UI->>NLQ: Send prompt + dataset_id
+  U->>WEB: Enter prompt
+  WEB->>NLQ: Send prompt + dataset_id
   NLQ->>SG: Fetch schema slice (tables/cols/FKs)
   NLQ->>EMB: Map synonyms/context → schema terms
   NLQ->>L: Structured prompt (schema + examples)
   L-->>NLQ: {sql, rationale, requires_confirmation}
   NLQ->>SAFE: Validate SQL
-  SAFE-->>UI: If write/unsafe → ask confirmation
-  UI->>SAFE: Confirm (if allowed) or cancel
+  SAFE-->>WEB: If write/unsafe → ask confirmation
+  WEB->>SAFE: Confirm (if allowed) or cancel
   SAFE->>QE: Approved SQL
   QE->>DB: Execute (timeout + row limit)
   DB-->>QE: Result set / error
   QE->>HX: Log run + meta
-  QE-->>UI: Results (tabular)
+  QE-->>WEB: Results (tabular)
 ```
 
 ### 4.2 Build DB from Given Data
@@ -173,17 +178,17 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
   actor U as User
-  participant UI as CLI/Web UI
+  participant WEB as Web UI
   participant ING as Ingestion
   participant DB as SQLite/DuckDB
   participant SG as Schema Service
 
-  U->>UI: Provide CSV/JSON/Parquet files or table spec
-  UI->>ING: Start ingestion
+  U->>WEB: Upload CSV/JSON/Parquet files or table spec
+  WEB->>ING: Start ingestion
   ING->>DB: Create DB/tables; load data
-  ING-->>UI: Ingestion summary
-  UI->>SG: Introspect & cache schema
-  SG-->>UI: Schema available for NL→SQL
+  ING-->>WEB: Ingestion summary
+  WEB->>SG: Introspect & cache schema
+  SG-->>WEB: Schema available for NL→SQL
 ```
 
 ---
