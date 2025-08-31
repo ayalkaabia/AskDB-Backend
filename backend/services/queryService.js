@@ -27,13 +27,10 @@ const convertToSQL = async (prompt) => {
   }
   
   // Default fallback - try to find a table that might match
-  const currentDb = await databaseRepo.getCurrentDatabase();
-  if (currentDb) {
-    const tables = await queryRepo.getTableNames();
-    if (tables.length > 0) {
-      const firstTable = tables[0];
-      return `SELECT * FROM ${firstTable} LIMIT 10;`;
-    }
+  const tables = await queryRepo.getTableNames();
+  if (tables.length > 0) {
+    const firstTable = tables[0];
+    return `SELECT * FROM ${firstTable} LIMIT 10;`;
   }
   
   return null;

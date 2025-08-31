@@ -3,14 +3,7 @@ const databaseRepo = require('./databaseRepo');
 
 class QueryRepository {
   async executeQuery(sqlQuery) {
-    const currentDb = await databaseRepo.getCurrentDatabase();
-    
-    if (!currentDb) {
-      throw new Error('No database loaded');
-    }
-
-    // For now, we'll use the main database connection
-    // In a more sophisticated setup, you might want to create separate connections for uploaded databases
+    // Use the main database connection directly (for seeded data)
     const connection = await pool.getConnection();
     try {
       const [rows] = await connection.execute(sqlQuery);
