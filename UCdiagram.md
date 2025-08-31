@@ -1,4 +1,4 @@
-User story and use case diagram:
+User story and use case Diagram:
 
 PlantUML code:
 @startuml
