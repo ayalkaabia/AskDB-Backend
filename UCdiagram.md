@@ -1,4 +1,5 @@
-User story and use case diagram
+User story and use case diagram:
+
 PlantUML code:
 @startuml
 left to right direction
@@ -34,9 +35,10 @@ rectangle "ASKDB Interface System" {
 @enduml
 Use case diagram:
  
-
+---------------------------------------------------------------------------------------
 
 User story :
+
 User Stories for ASKDB Interface System
 As a user:
 1.	I want to upload a database file, so that I can start exploring data.
