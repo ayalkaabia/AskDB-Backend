@@ -2,11 +2,11 @@ const { pool } = require('../utils/database');
 const databaseRepo = require('./databaseRepo');
 
 class QueryRepository {
-  async executeQuery(sqlQuery) {
+  async executeQuery(sqlQuery, params = []) {
     // Use the main database connection directly (for seeded data)
     const connection = await pool.getConnection();
     try {
-      const [rows] = await connection.execute(sqlQuery);
+      const [rows] = await connection.execute(sqlQuery, params);
       return rows;
     } catch (error) {
       console.error('Query execution error:', error);

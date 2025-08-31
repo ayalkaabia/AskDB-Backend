@@ -91,7 +91,52 @@ const runSQL = async (req, res) => {
   }
 };
 
+// New AI-related controller methods
+const getDatabaseSchema = async (req, res) => {
+  try {
+    const schema = await queryService.getDatabaseSchema();
+    if (!schema) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'No database schema found. Please upload a database first.'
+      });
+    }
+
+    res.status(200).json({
+      schema: schema
+    });
+
+  } catch (error) {
+    console.error('Schema retrieval error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to retrieve database schema'
+    });
+  }
+};
+
+const testAIConnection = async (req, res) => {
+  try {
+    const isConnected = await queryService.testAIConnection();
+    const modelInfo = queryService.getAIModelInfo();
+
+    res.status(200).json({
+      ai_connected: isConnected,
+      model_info: modelInfo
+    });
+
+  } catch (error) {
+    console.error('AI connection test error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to test AI connection'
+    });
+  }
+};
+
 module.exports = {
   processQuery,
-  runSQL
+  runSQL,
+  getDatabaseSchema,
+  testAIConnection
 };

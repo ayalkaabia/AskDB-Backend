@@ -35,12 +35,10 @@ const upload = multer({
   storage: storage,
   fileFilter: (req, file, cb) => {
     if (file.mimetype === 'application/octet-stream' || 
-        file.originalname.endsWith('.db') ||
-        file.originalname.endsWith('.sqlite') ||
-        file.originalname.endsWith('.sqlite3')) {
+        file.originalname.endsWith('.sql')) {
       cb(null, true);
     } else {
-      cb(new Error('Only .db, .sqlite, and .sqlite3 files are allowed'), false);
+      cb(new Error('Only .sql files are allowed'), false);
     }
   },
   limits: {
@@ -59,6 +57,8 @@ router.get('/', (req, res) => {
       'POST /upload-db': 'Upload a database file',
       'POST /query': 'Submit natural language query',
       'POST /run-sql': 'Execute raw SQL query',
+      'GET /schema': 'Get current database schema',
+      'GET /test-ai': 'Test AI connection',
       'GET /history': 'Get query history',
       'GET /export': 'Export query results'
     }
@@ -73,6 +73,12 @@ router.post('/query', validateQuery, queryController.processQuery);
 
 // POST /run-sql - Execute raw SQL query
 router.post('/run-sql', validateSQL, queryController.runSQL);
+
+// GET /schema - Get current database schema
+router.get('/schema', queryController.getDatabaseSchema);
+
+// GET /test-ai - Test AI connection
+router.get('/test-ai', queryController.testAIConnection);
 
 // GET /history - Get query history
 router.get('/history', historyController.getHistory);

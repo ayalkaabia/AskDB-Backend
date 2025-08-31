@@ -1,11 +1,35 @@
 const queryRepo = require('../repos/queryRepo');
 const databaseRepo = require('../repos/databaseRepo');
+const aiService = require('./aiService');
+const schemaService = require('./schemaService');
 
-// Simple natural language to SQL conversion (in production, use AI/ML models)
+// AI-powered natural language to SQL conversion
 const convertToSQL = async (prompt) => {
+  try {
+    // Check if we have an active database
+    const currentDb = await databaseRepo.getCurrentDatabase();
+    if (!currentDb) {
+      throw new Error('No active database found. Please upload a database first.');
+    }
+
+    // Use AI to convert natural language to SQL
+    const sqlQuery = await aiService.convertToSQL(prompt);
+    return sqlQuery;
+    
+  } catch (error) {
+    console.error('AI conversion error:', error);
+    
+    // Fallback to basic pattern matching if AI fails
+    console.log('Falling back to pattern matching...');
+    return await fallbackConvertToSQL(prompt);
+  }
+};
+
+// Fallback pattern matching (kept for reliability)
+const fallbackConvertToSQL = async (prompt) => {
   const lowerPrompt = prompt.toLowerCase();
   
-  // Very basic conversion rules - in production, use proper NLP/AI
+  // Basic conversion rules as fallback
   if (lowerPrompt.includes('top') && lowerPrompt.includes('selling') && lowerPrompt.includes('product')) {
     return "SELECT name, SUM(sales) as total_sales FROM products WHERE year=2025 GROUP BY name ORDER BY SUM(sales) DESC LIMIT 5;";
   }
@@ -30,7 +54,7 @@ const convertToSQL = async (prompt) => {
   const tables = await queryRepo.getTableNames();
   if (tables.length > 0) {
     const firstTable = tables[0];
-    return `SELECT * FROM ${firstTable} LIMIT 10;`;
+    return `SELECT * FROM \`${firstTable}\` LIMIT 10;`;
   }
   
   return null;
@@ -57,10 +81,36 @@ const testConnection = async () => {
   return await queryRepo.testConnection();
 };
 
+// New methods for AI integration
+const getDatabaseSchema = async () => {
+  try {
+    return await schemaService.getCompleteSchema();
+  } catch (error) {
+    console.error('Error getting database schema:', error);
+    return null;
+  }
+};
+
+const testAIConnection = async () => {
+  try {
+    return await aiService.testConnection();
+  } catch (error) {
+    console.error('Error testing AI connection:', error);
+    return false;
+  }
+};
+
+const getAIModelInfo = () => {
+  return aiService.getModelInfo();
+};
+
 module.exports = {
   convertToSQL,
   executeQuery,
   getTableSchema,
   getTableNames,
-  testConnection
+  testConnection,
+  getDatabaseSchema,
+  testAIConnection,
+  getAIModelInfo
 };

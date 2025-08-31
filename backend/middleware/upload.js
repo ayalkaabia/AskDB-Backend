@@ -8,12 +8,10 @@ const uploadMiddleware = (req, res, next) => {
     fileFilter: (req, file, cb) => {
       // Check file type
       if (file.mimetype === 'application/octet-stream' || 
-          file.originalname.endsWith('.db') ||
-          file.originalname.endsWith('.sqlite') ||
-          file.originalname.endsWith('.sqlite3')) {
+          file.originalname.endsWith('.sql')) {
         cb(null, true);
       } else {
-        cb(new Error('Only .db, .sqlite, and .sqlite3 files are allowed'), false);
+        cb(new Error('Only .sql files are allowed'), false);
       }
     },
     limits: {

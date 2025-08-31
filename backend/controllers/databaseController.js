@@ -14,7 +14,7 @@ const uploadDatabase = async (req, res) => {
     const filePath = req.file.path;
     const fileName = req.file.originalname;
 
-    // Validate that the file is a valid SQLite database
+    // Validate that the file is a valid MySQL database
     const isValidDatabase = await databaseService.validateDatabase(filePath);
     if (!isValidDatabase) {
       // Clean up invalid file
