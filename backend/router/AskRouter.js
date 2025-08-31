@@ -50,6 +50,21 @@ const upload = multer({
 
 // API Routes
 
+// GET / - API root endpoint
+router.get('/', (req, res) => {
+  res.json({
+    message: 'AskDB API is running',
+    version: '1.0.0',
+    endpoints: {
+      'POST /upload-db': 'Upload a database file',
+      'POST /query': 'Submit natural language query',
+      'POST /run-sql': 'Execute raw SQL query',
+      'GET /history': 'Get query history',
+      'GET /export': 'Export query results'
+    }
+  });
+});
+
 // POST /upload-db - Upload a database file
 router.post('/upload-db', upload.single('file'), databaseController.uploadDatabase);
 

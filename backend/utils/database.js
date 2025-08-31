@@ -1,3 +1,6 @@
+// Load environment variables from .env at the very top
+require('dotenv').config();
+
 const mysql = require('mysql2/promise');
 
 // Database configuration
@@ -6,7 +9,7 @@ const dbConfig = {
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'askdb',
-  port: process.env.DB_PORT || 3306,
+  port: Number(process.env.DB_PORT) || 3306,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
