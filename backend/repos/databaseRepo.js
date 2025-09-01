@@ -206,7 +206,7 @@ class DatabaseRepository {
     const connection = await pool.getConnection();
     try {
       const [rows] = await connection.execute(
-        'SELECT * FROM databases WHERE status = "active" ORDER BY uploaded_at DESC LIMIT 1'
+        'SELECT * FROM `databases` WHERE status = "active" ORDER BY uploaded_at DESC LIMIT 1'
       );
       
       return rows.length > 0 ? rows[0] : null;

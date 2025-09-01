@@ -1,6 +1,5 @@
 const OpenAI = require('openai');
 const schemaService = require('./schemaService');
-require('dotenv').config();
 
 
 // Initialize OpenAI client

@@ -19,9 +19,10 @@ class QueryRepository {
   async getTableSchema(tableName) {
     const connection = await pool.getConnection();
     try {
+      // Use backticks to properly escape table names
+      const escapedTableName = '`' + tableName.replace(/`/g, '``') + '`';
       const [rows] = await connection.execute(
-        'DESCRIBE ??',
-        [tableName]
+        `DESCRIBE ${escapedTableName}`
       );
       return rows;
     } catch (error) {
