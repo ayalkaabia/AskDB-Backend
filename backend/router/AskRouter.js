@@ -10,6 +10,10 @@ const queryController = require('../controllers/queryController');
 const historyController = require('../controllers/historyController');
 const exportController = require('../controllers/exportController');
 
+// Import routers
+const userRouter = require('./userRouter');
+const permissionRouter = require('./permissionRouter');
+
 // Import middleware
 const { validateQuery, validateSQL } = require('../middleware/validation');
 const { uploadMiddleware } = require('../middleware/upload');
@@ -68,6 +72,27 @@ router.get('/', (req, res) => {
 // POST /upload-db - Upload a database file
 router.post('/upload-db', upload.single('file'), databaseController.uploadDatabase);
 
+// GET /databases - Get all databases
+router.get('/databases', databaseController.getAllDatabases);
+
+// POST /databases - Create a new database
+router.post('/databases', databaseController.createDatabase);
+
+// GET /databases/:id - Get specific database by ID
+router.get('/databases/:id', databaseController.getDatabaseById);
+
+// GET /databases/:id/schema - Get database schema
+router.get('/databases/:id/schema', databaseController.getDatabaseSchema);
+
+// DELETE /databases/:id - Delete specific database
+router.delete('/databases/:id', databaseController.deleteDatabase);
+
+// POST /databases/:id/backup - Create backup of specific database
+router.post('/databases/:id/backup', databaseController.createBackup);
+
+// GET /databases/stats - Get database statistics
+router.get('/databases/stats', databaseController.getDatabaseStats);
+
 // POST /query - Submit natural language prompt
 router.post('/query', validateQuery, queryController.processQuery);
 
@@ -83,8 +108,31 @@ router.get('/test-ai', queryController.testAIConnection);
 // GET /history - Get query history
 router.get('/history', historyController.getHistory);
 
+// GET /history/:id - Get specific history item by ID
+router.get('/history/:id', historyController.getHistoryById);
+
+// GET /history/user/:userId - Get history by specific user
+router.get('/history/user/:userId', historyController.getHistoryByUserId);
+
+// GET /history/search - Search history by keyword
+router.get('/history/search', historyController.searchHistory);
+
+// DELETE /history/:id - Delete specific history item
+router.delete('/history/:id', historyController.deleteHistoryById);
+
+// PUT /history/:id - Update specific history item
+router.put('/history/:id', historyController.updateHistoryById);
+
+// GET /history/stats - Get history statistics
+router.get('/history/stats', historyController.getHistoryStats);
+
 // GET /export - Export query results
 router.get('/export', exportController.exportResults);
+
+// Use additional routers
+router.use('/auth', userRouter);
+router.use('/users', userRouter);
+router.use('/permissions', permissionRouter);
 
 module.exports = router;
 

@@ -12,6 +12,22 @@ const getHistoryById = async (id) => {
   return await historyRepo.getHistoryById(id);
 };
 
+const getHistoryByUserId = async (userId, limit = 50, offset = 0) => {
+  return await historyRepo.getHistoryByUserId(userId, limit, offset);
+};
+
+const searchHistory = async (query, limit = 50, offset = 0) => {
+  return await historyRepo.searchHistory(query, limit, offset);
+};
+
+const deleteHistoryById = async (id) => {
+  return await historyRepo.deleteHistoryById(id);
+};
+
+const updateHistoryById = async (id, updateData) => {
+  return await historyRepo.updateHistoryById(id, updateData);
+};
+
 const clearHistory = async () => {
   return await historyRepo.clearHistory();
 };
@@ -24,6 +40,10 @@ module.exports = {
   addToHistory,
   getHistory,
   getHistoryById,
+  getHistoryByUserId,
+  searchHistory,
+  deleteHistoryById,
+  updateHistoryById,
   clearHistory,
   getHistoryStats
 };

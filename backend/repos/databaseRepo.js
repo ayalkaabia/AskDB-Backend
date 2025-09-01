@@ -6,19 +6,199 @@ class DatabaseRepository {
   async storeDatabaseInfo(filePath, fileName) {
     const connection = await pool.getConnection();
     try {
-      // Deactivate all other databases
-      await connection.execute('UPDATE uploaded_databases SET is_active = FALSE');
+      const id = uuidv4();
+      const fileSize = fs.statSync(filePath).size;
       
-      // Insert new database
-      const dbId = uuidv4();
       await connection.execute(
-        'INSERT INTO uploaded_databases (id, name, file_path, is_active) VALUES (?, ?, ?, ?)',
-        [dbId, fileName, filePath, true]
+        'INSERT INTO databases (id, name, file_path, file_size, status, uploaded_at) VALUES (?, ?, ?, ?, ?, NOW())',
+        [id, fileName, filePath, fileSize, 'active']
       );
       
-      return { id: dbId, name: fileName, path: filePath };
+      return {
+        id,
+        name: fileName,
+        file_path: filePath,
+        file_size: fileSize,
+        status: 'active',
+        uploaded_at: new Date().toISOString()
+      };
     } finally {
       connection.release();
+    }
+  }
+
+  async updateDatabasePath(id, newPath) {
+    const connection = await pool.getConnection();
+    try {
+      const fileSize = fs.statSync(newPath).size;
+      
+      await connection.execute(
+        'UPDATE databases SET file_path = ?, file_size = ? WHERE id = ?',
+        [newPath, fileSize, id]
+      );
+      
+      return true;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async getAllDatabases(limit = 50, offset = 0, status = null) {
+    const connection = await pool.getConnection();
+    try {
+      let query = 'SELECT * FROM databases';
+      let params = [];
+      
+      if (status) {
+        query += ' WHERE status = ?';
+        params.push(status);
+      }
+      
+      query += ' ORDER BY uploaded_at DESC LIMIT ? OFFSET ?';
+      params.push(limit, offset);
+      
+      const [rows] = await connection.execute(query, params);
+      
+      return rows;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async createDatabase(databaseData) {
+    const connection = await pool.getConnection();
+    try {
+      const id = uuidv4();
+      
+      await connection.execute(
+        'INSERT INTO databases (id, name, description, type, connection_string, status, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
+        [
+          id,
+          databaseData.name,
+          databaseData.description,
+          databaseData.type,
+          databaseData.connection_string,
+          'active'
+        ]
+      );
+      
+      return {
+        id,
+        name: databaseData.name,
+        description: databaseData.description,
+        type: databaseData.type,
+        connection_string: databaseData.connection_string,
+        status: 'active',
+        created_at: new Date().toISOString()
+      };
+    } finally {
+      connection.release();
+    }
+  }
+
+  async getDatabaseById(id) {
+    const connection = await pool.getConnection();
+    try {
+      const [rows] = await connection.execute(
+        'SELECT * FROM databases WHERE id = ?',
+        [id]
+      );
+      
+      return rows.length > 0 ? rows[0] : null;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async deleteDatabase(id) {
+    const connection = await pool.getConnection();
+    try {
+      const [result] = await connection.execute(
+        'DELETE FROM databases WHERE id = ?',
+        [id]
+      );
+      
+      return result.affectedRows > 0;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async createBackup(backupData) {
+    const connection = await pool.getConnection();
+    try {
+      const id = uuidv4();
+      
+      await connection.execute(
+        'INSERT INTO database_backups (id, database_id, name, description, file_path, file_size, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
+        [
+          id,
+          backupData.database_id,
+          backupData.name,
+          backupData.description,
+          backupData.file_path,
+          backupData.file_size
+        ]
+      );
+      
+      return {
+        id,
+        database_id: backupData.database_id,
+        name: backupData.name,
+        description: backupData.description,
+        file_path: backupData.file_path,
+        file_size: backupData.file_size,
+        created_at: backupData.created_at
+      };
+    } finally {
+      connection.release();
+    }
+  }
+
+  async getDatabaseStats() {
+    const connection = await pool.getConnection();
+    try {
+      const [rows] = await connection.execute(`
+        SELECT 
+          COUNT(*) as total_databases,
+          COUNT(CASE WHEN status = 'active' THEN 1 END) as active_databases,
+          COUNT(CASE WHEN status = 'inactive' THEN 1 END) as inactive_databases,
+          SUM(file_size) as total_size,
+          AVG(file_size) as average_size,
+          MAX(uploaded_at) as latest_upload,
+          MIN(uploaded_at) as earliest_upload
+        FROM databases
+      `);
+      
+      return rows[0] || {
+        total_databases: 0,
+        active_databases: 0,
+        inactive_databases: 0,
+        total_size: 0,
+        average_size: 0,
+        latest_upload: null,
+        earliest_upload: null
+      };
+    } finally {
+      connection.release();
+    }
+  }
+
+  async validateDatabaseFile(filePath) {
+    // Basic validation - check if file exists and has content
+    try {
+      if (!fs.existsSync(filePath)) {
+        return false;
+      }
+      
+      const stats = fs.statSync(filePath);
+      if (stats.size === 0) {
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      return false;
     }
   }
 
@@ -26,88 +206,13 @@ class DatabaseRepository {
     const connection = await pool.getConnection();
     try {
       const [rows] = await connection.execute(
-        'SELECT * FROM uploaded_databases WHERE is_active = TRUE LIMIT 1'
-      );
-      return rows.length > 0 ? rows[0] : null;
-    } finally {
-      connection.release();
-    }
-  }
-
-  async getAllDatabases() {
-    const connection = await pool.getConnection();
-    try {
-      const [rows] = await connection.execute(
-        'SELECT * FROM uploaded_databases ORDER BY uploaded_at DESC'
-      );
-      return rows;
-    } finally {
-      connection.release();
-    }
-  }
-
-  async getDatabaseById(dbId) {
-    const connection = await pool.getConnection();
-    try {
-      const [rows] = await connection.execute(
-        'SELECT * FROM uploaded_databases WHERE id = ?',
-        [dbId]
-      );
-      return rows.length > 0 ? rows[0] : null;
-    } finally {
-      connection.release();
-    }
-  }
-
-  async deleteDatabase(dbId) {
-    const connection = await pool.getConnection();
-    try {
-      const [rows] = await connection.execute(
-        'SELECT file_path FROM uploaded_databases WHERE id = ?',
-        [dbId]
+        'SELECT * FROM databases WHERE status = "active" ORDER BY uploaded_at DESC LIMIT 1'
       );
       
-      if (rows.length > 0) {
-        const filePath = rows[0].file_path;
-        
-        // Delete file from filesystem
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
-        
-        // Delete from database
-        await connection.execute('DELETE FROM uploaded_databases WHERE id = ?', [dbId]);
-        return true;
-      }
-      return false;
+      return rows.length > 0 ? rows[0] : null;
     } finally {
       connection.release();
     }
-  }
-
-  async validateDatabaseFile(filePath) {
-    // This is a basic validation - in production, you might want more sophisticated validation
-    return new Promise((resolve) => {
-      try {
-        // Check if file exists and is readable
-        if (!fs.existsSync(filePath)) {
-          resolve(false);
-          return;
-        }
-        
-        // Check file size (basic validation)
-        const stats = fs.statSync(filePath);
-        if (stats.size === 0) {
-          resolve(false);
-          return;
-        }
-        
-        resolve(true);
-      } catch (error) {
-        console.error('File validation error:', error);
-        resolve(false);
-      }
-    });
   }
 }
 
