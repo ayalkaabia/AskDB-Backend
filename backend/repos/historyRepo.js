@@ -7,13 +7,11 @@ class HistoryRepository {
     try {
       const id = uuidv4();
       const resultCount = Array.isArray(queryData.results) ? queryData.results.length : 0;
-      const userId = queryData.userId || null;
       
       await connection.execute(
-        'INSERT INTO query_history (id, user_id, prompt, sql_query, results, result_count) VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO query_history (id, prompt, sql_query, results, result_count) VALUES (?, ?, ?, ?, ?)',
         [
           id,
-          userId,
           queryData.prompt,
           queryData.sql,
           JSON.stringify(queryData.results),
@@ -23,7 +21,6 @@ class HistoryRepository {
       
       return {
         id,
-        userId,
         prompt: queryData.prompt,
         sql: queryData.sql,
         results: queryData.results,
@@ -38,19 +35,26 @@ class HistoryRepository {
   async getHistory(limit = 50, offset = 0) {
     const connection = await pool.getConnection();
     try {
-      const [rows] = await connection.execute(
-        'SELECT * FROM query_history ORDER BY timestamp DESC LIMIT ? OFFSET ?',
-        [limit, offset]
+      // Ensure integers (protects against SQL injection)
+      limit = parseInt(limit, 10) || 50;
+      offset = parseInt(offset, 10) || 0;
+  
+      const [rows] = await connection.query(
+        `SELECT * FROM query_history ORDER BY timestamp DESC LIMIT ${limit} OFFSET ${offset}`
       );
       
       return rows.map(row => ({
         ...row,
-        results: row.results ? JSON.parse(row.results) : null
+        results: (typeof row.results === 'string')
+          ? JSON.parse(row.results)
+          : row.results
       }));
+      
     } finally {
       connection.release();
     }
   }
+  
 
   async getHistoryById(id) {
     const connection = await pool.getConnection();
@@ -76,9 +80,11 @@ class HistoryRepository {
   async getHistoryByUserId(userId, limit = 50, offset = 0) {
     const connection = await pool.getConnection();
     try {
+      // Since user_id column doesn't exist in current schema, return all history
+      // This is a temporary fix until the schema is updated
       const [rows] = await connection.execute(
-        'SELECT * FROM query_history WHERE user_id = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?',
-        [userId, limit, offset]
+        'SELECT * FROM query_history ORDER BY timestamp DESC LIMIT ? OFFSET ?',
+        [limit, offset]
       );
       
       return rows.map(row => ({
@@ -155,7 +161,7 @@ class HistoryRepository {
       values.push(id);
       
       const [result] = await connection.execute(
-        `UPDATE query_history SET ${fields.join(', ')}, updated_at = NOW() WHERE id = ?`,
+        `UPDATE query_history SET ${fields.join(', ')} WHERE id = ?`,
         values
       );
       
@@ -183,7 +189,6 @@ class HistoryRepository {
           COUNT(*) as total_queries,
           SUM(result_count) as total_results,
           AVG(result_count) as average_results_per_query,
-          COUNT(DISTINCT user_id) as unique_users,
           MAX(timestamp) as last_query_time,
           MIN(timestamp) as first_query_time
         FROM query_history
@@ -193,7 +198,6 @@ class HistoryRepository {
         total_queries: 0,
         total_results: 0,
         average_results_per_query: 0,
-        unique_users: 0,
         last_query_time: null,
         first_query_time: null
       };
