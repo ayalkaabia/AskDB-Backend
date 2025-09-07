@@ -9,6 +9,7 @@ const databaseController = require('../controllers/databaseController');
 const queryController = require('../controllers/queryController');
 const historyController = require('../controllers/historyController');
 const exportController = require('../controllers/exportController');
+const chatController = require('../controllers/chatController');
 
 
 // Import middleware
@@ -47,6 +48,19 @@ const upload = multer({
 });
 
 // =============================================================================
+// CHAT ROUTES
+// =============================================================================
+
+// POST /chat - Main chat endpoint
+router.post('/chat', upload.single('file'), chatController.processChat);
+
+// GET /chat/history/:conversation_id - Get conversation history
+router.get('/chat/history/:conversation_id', chatController.getConversationHistory);
+
+// GET /chat/conversations - List all conversations
+router.get('/chat/conversations', chatController.listConversations);
+
+// =============================================================================
 // API ROUTES
 // =============================================================================
 
@@ -56,6 +70,11 @@ router.get('/', (req, res) => {
     message: 'AskDB API is running',
     version: '2.0.0',
     endpoints: {
+      // Chat Interface
+      'POST /chat': 'Main chat interface - handles everything',
+      'GET /chat/history/:id': 'Get conversation history',
+      'GET /chat/conversations': 'List all conversations',
+      
       // Database Management
       'POST /upload-db': 'Upload a database file',
       'GET /databases': 'Get all databases',

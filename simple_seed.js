@@ -82,6 +82,7 @@ async function simpleSeed() {
                 result_count INT DEFAULT 0,
                 execution_time_ms INT,
                 database_id VARCHAR(36),
+                conversation_id VARCHAR(36),
                 query_type ENUM('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER', 'OTHER') DEFAULT 'SELECT',
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP

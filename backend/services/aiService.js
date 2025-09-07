@@ -212,6 +212,377 @@ Generate the appropriate MySQL query to fulfill this request. Return only the SQ
       temperature: this.temperature
     };
   }
+
+  /**
+   * Process chat requests with function calling
+   */
+  async processChatRequest(chatRequest) {
+    try {
+      const { message, file, conversation_id } = chatRequest;
+      
+      const systemPrompt = this.buildChatSystemPrompt();
+      
+      let userMessage = message;
+      if (file) {
+        userMessage += `\n\n[File attached: ${file.originalname}]`;
+      }
+
+      const functions = this.getAvailableFunctions();
+      const completion = await openai.chat.completions.create({
+        model: this.model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMessage }
+        ],
+        functions: functions,
+        function_call: 'auto',
+        max_tokens: this.maxTokens,
+        temperature: this.temperature,
+      });
+
+      const response = completion.choices[0]?.message;
+      
+      if (!response) {
+        throw new Error('No response from OpenAI');
+      }
+
+      if (response.function_call) {
+        return await this.handleFunctionCall(response.function_call, file, conversation_id);
+      }
+      return {
+        message: response.content,
+        action_type: 'chat',
+        sql: null,
+        results: null,
+        database_id: null,
+        query_type: 'OTHER'
+      };
+
+    } catch (error) {
+      console.error('Chat processing error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Build system prompt for chat
+   */
+  buildChatSystemPrompt() {
+    return `You are AskDB, an AI assistant that helps users manage MySQL databases through natural language.
+
+You can help users with:
+1. Creating new databases and tables
+2. Querying existing data
+3. Managing database schemas
+4. Processing uploaded database files
+
+Available functions:
+- create_database: Create a new MySQL database
+- execute_query: Run SQL queries on existing databases
+- get_schema: Get database schema information
+- list_databases: List all available databases
+- create_database_from_file: Create database from uploaded file
+
+Guidelines:
+- Always be helpful and conversational
+- Explain what you're doing in plain language
+- When creating databases, suggest meaningful names and structures
+- For queries, always show the SQL and results
+- If a user uploads a file, offer to create a database from it
+- Be proactive in suggesting next steps
+
+Respond naturally and call functions when needed to help the user.`;
+  }
+
+  /**
+   * Get available functions
+   */
+  getAvailableFunctions() {
+    return [
+      {
+        name: 'create_database',
+        description: 'Create a new MySQL database with tables',
+        parameters: {
+          type: 'object',
+          properties: {
+            name: {
+              type: 'string',
+              description: 'Name of the database to create'
+            },
+            description: {
+              type: 'string',
+              description: 'Description of the database'
+            },
+            tables: {
+              type: 'array',
+              description: 'Array of table definitions',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  columns: { type: 'array' }
+                }
+              }
+            }
+          },
+          required: ['name']
+        }
+      },
+      {
+        name: 'execute_query',
+        description: 'Execute a SQL query on a database',
+        parameters: {
+          type: 'object',
+          properties: {
+            sql: {
+              type: 'string',
+              description: 'SQL query to execute'
+            },
+            database_id: {
+              type: 'string',
+              description: 'ID of the database to query'
+            }
+          },
+          required: ['sql']
+        }
+      },
+      {
+        name: 'get_schema',
+        description: 'Get schema information for a database',
+        parameters: {
+          type: 'object',
+          properties: {
+            database_id: {
+              type: 'string',
+              description: 'ID of the database'
+            }
+          },
+          required: ['database_id']
+        }
+      },
+      {
+        name: 'list_databases',
+        description: 'List all available databases',
+        parameters: {
+          type: 'object',
+          properties: {}
+        }
+      },
+      {
+        name: 'create_database_from_file',
+        description: 'Create a database from an uploaded file',
+        parameters: {
+          type: 'object',
+          properties: {
+            filename: {
+              type: 'string',
+              description: 'Name of the uploaded file'
+            },
+            file_content: {
+              type: 'string',
+              description: 'Content of the file (if available)'
+            }
+          },
+          required: ['filename']
+        }
+      }
+    ];
+  }
+
+  /**
+   * Handle function calls
+   */
+  async handleFunctionCall(functionCall, file, conversation_id) {
+    const { name, arguments: args } = functionCall;
+    
+    try {
+      let result;
+      let message;
+
+      switch (name) {
+        case 'create_database':
+          result = await this.executeCreateDatabase(args);
+          message = `✅ Database "${args.name}" created successfully!`;
+          break;
+
+        case 'execute_query':
+          result = await this.executeQuery(args);
+          message = `📊 Query executed successfully. Found ${result.results?.length || 0} results.`;
+          break;
+
+        case 'get_schema':
+          result = await this.executeGetSchema(args);
+          message = `📋 Here's the schema for database ${args.database_id}:`;
+          break;
+
+        case 'list_databases':
+          result = await this.executeListDatabases();
+          message = `📁 Here are all available databases:`;
+          break;
+
+        case 'create_database_from_file':
+          result = await this.executeCreateDatabaseFromFile(args, file);
+          message = `✅ Database created from file "${args.filename}" successfully!`;
+          break;
+
+        default:
+          throw new Error(`Unknown function: ${name}`);
+      }
+
+      return {
+        message,
+        action_type: name,
+        sql: result.sql || null,
+        results: result.results || null,
+        database_id: result.database_id || null,
+        query_type: this.determineQueryType(result.sql)
+      };
+
+    } catch (error) {
+      console.error(`Function call error (${name}):`, error);
+      return {
+        message: `❌ Error executing ${name}: ${error.message}`,
+        action_type: 'error',
+        sql: null,
+        results: null,
+        database_id: null,
+        query_type: 'OTHER'
+      };
+    }
+  }
+
+  /**
+   * Execute create_database
+   */
+  async executeCreateDatabase(args) {
+    const databaseService = require('./databaseService');
+    
+    const dbData = {
+      name: args.name,
+      description: args.description || `Database created via chat: ${args.name}`,
+      type: 'mysql'
+    };
+
+    const database = await databaseService.createDatabase(dbData);
+    
+    if (args.tables && args.tables.length > 0) {
+      const connectionManager = require('./databaseConnectionManager');
+      
+      for (const table of args.tables) {
+        const createTableSQL = this.generateCreateTableSQL(table);
+        await connectionManager.executeQuery(args.name, createTableSQL);
+      }
+    }
+
+    return {
+      database_id: database.id,
+      sql: `CREATE DATABASE ${args.name}`,
+      results: { database_created: true, database_id: database.id }
+    };
+  }
+
+  /**
+   * Execute query
+   */
+  async executeQuery(args) {
+    const databaseService = require('./databaseService');
+    
+    if (args.database_id) {
+      const results = await databaseService.executeQuery(args.database_id, args.sql);
+      return {
+        sql: args.sql,
+        results: results,
+        database_id: args.database_id
+      };
+    } else {
+      const queryService = require('./queryService');
+      const results = await queryService.executeQuery(args.sql);
+      return {
+        sql: args.sql,
+        results: results,
+        database_id: null
+      };
+    }
+  }
+
+  /**
+   * Execute get_schema
+   */
+  async executeGetSchema(args) {
+    const databaseService = require('./databaseService');
+    const schema = await databaseService.getDatabaseSchema(args.database_id);
+    
+    return {
+      results: schema,
+      database_id: args.database_id
+    };
+  }
+
+  /**
+   * Execute list_databases
+   */
+  async executeListDatabases() {
+    const databaseService = require('./databaseService');
+    const databases = await databaseService.getAllDatabases();
+    
+    return {
+      results: databases
+    };
+  }
+
+  /**
+   * Execute create_database_from_file
+   */
+  async executeCreateDatabaseFromFile(args, file) {
+    const databaseService = require('./databaseService');
+    
+    const dbData = {
+      name: args.filename.replace(/\.[^/.]+$/, ""),
+      description: `Database created from file: ${args.filename}`,
+      type: 'mysql'
+    };
+
+    const database = await databaseService.createDatabase(dbData);
+    
+    if (file && file.buffer) {
+      const connectionManager = require('./databaseConnectionManager');
+      await connectionManager.importSQLFile(dbData.name, file.buffer.toString());
+    }
+
+    return {
+      database_id: database.id,
+      sql: `CREATE DATABASE FROM FILE: ${args.filename}`,
+      results: { database_created: true, database_id: database.id }
+    };
+  }
+
+  /**
+   * Generate CREATE TABLE SQL
+   */
+  generateCreateTableSQL(table) {
+    const columns = table.columns.map(col => 
+      `${col.name} ${col.type}${col.primary ? ' PRIMARY KEY' : ''}${col.nullable === false ? ' NOT NULL' : ''}`
+    ).join(', ');
+    
+    return `CREATE TABLE ${table.name} (${columns})`;
+  }
+
+  /**
+   * Determine query type
+   */
+  determineQueryType(sql) {
+    if (!sql) return 'OTHER';
+    
+    const upperSQL = sql.toUpperCase().trim();
+    if (upperSQL.startsWith('SELECT')) return 'SELECT';
+    if (upperSQL.startsWith('INSERT')) return 'INSERT';
+    if (upperSQL.startsWith('UPDATE')) return 'UPDATE';
+    if (upperSQL.startsWith('DELETE')) return 'DELETE';
+    if (upperSQL.startsWith('CREATE')) return 'CREATE';
+    if (upperSQL.startsWith('DROP')) return 'DROP';
+    if (upperSQL.startsWith('ALTER')) return 'ALTER';
+    return 'OTHER';
+  }
 }
 
 module.exports = new AIService();

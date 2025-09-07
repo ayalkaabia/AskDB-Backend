@@ -209,6 +209,45 @@ class HistoryRepository {
       connection.release();
     }
   }
+
+  async getHistoryByConversation(conversationId, limit = 50, offset = 0) {
+    const connection = await this.pool.getConnection();
+    
+    try {
+      const [rows] = await connection.execute(`
+        SELECT * FROM \`query_history\` 
+        WHERE conversation_id = ? 
+        ORDER BY timestamp DESC 
+        LIMIT ? OFFSET ?
+      `, [conversationId, limit, offset]);
+      
+      return rows;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async getAllConversations() {
+    const connection = await this.pool.getConnection();
+    
+    try {
+      const [rows] = await connection.execute(`
+        SELECT 
+          conversation_id,
+          COUNT(*) as message_count,
+          MIN(timestamp) as first_message,
+          MAX(timestamp) as last_message
+        FROM \`query_history\` 
+        WHERE conversation_id IS NOT NULL
+        GROUP BY conversation_id
+        ORDER BY last_message DESC
+      `);
+      
+      return rows;
+    } finally {
+      connection.release();
+    }
+  }
 }
 
 module.exports = new HistoryRepository();

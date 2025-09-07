@@ -4,6 +4,13 @@ const addToHistory = async (queryData) => {
   return await historyRepo.addToHistory(queryData);
 };
 
+const addToHistoryWithConversation = async (queryData, conversationId) => {
+  return await historyRepo.addToHistory({
+    ...queryData,
+    conversation_id: conversationId
+  });
+};
+
 const getHistory = async (limit = 50, offset = 0) => {
   return await historyRepo.getHistory(limit, offset);
 };
@@ -33,13 +40,24 @@ const getHistoryStats = async () => {
   return await historyRepo.getHistoryStats();
 };
 
+const getHistoryByConversation = async (conversationId, limit = 50, offset = 0) => {
+  return await historyRepo.getHistoryByConversation(conversationId, limit, offset);
+};
+
+const getAllConversations = async () => {
+  return await historyRepo.getAllConversations();
+};
+
 module.exports = {
   addToHistory,
+  addToHistoryWithConversation,
   getHistory,
   getHistoryById,
   searchHistory,
   deleteHistoryById,
   updateHistoryById,
   clearHistory,
-  getHistoryStats
+  getHistoryStats,
+  getHistoryByConversation,
+  getAllConversations
 };
