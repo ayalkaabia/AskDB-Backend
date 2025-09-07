@@ -2,22 +2,7 @@
 -- This file contains all the tables needed for the expanded system
 
 
--- Enhanced query history table
-CREATE TABLE IF NOT EXISTS query_history (
-    id VARCHAR(36) PRIMARY KEY,
-    prompt TEXT,
-    sql_query TEXT NOT NULL,
-    results JSON,
-    result_count INT DEFAULT 0,
-    execution_time_ms INT,
-    database_id VARCHAR(36),
-    query_type ENUM('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER', 'OTHER') DEFAULT 'SELECT',
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (database_id) REFERENCES databases(id) ON DELETE SET NULL
-);
-
--- Databases table
+-- Databases table (created first to avoid foreign key issues)
 CREATE TABLE IF NOT EXISTS databases (
     id VARCHAR(36) PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE,
@@ -32,6 +17,21 @@ CREATE TABLE IF NOT EXISTS databases (
     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Enhanced query history table
+CREATE TABLE IF NOT EXISTS query_history (
+    id VARCHAR(36) PRIMARY KEY,
+    prompt TEXT,
+    sql_query TEXT NOT NULL,
+    results JSON,
+    result_count INT DEFAULT 0,
+    execution_time_ms INT,
+    database_id VARCHAR(36),
+    query_type ENUM('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER', 'OTHER') DEFAULT 'SELECT',
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (database_id) REFERENCES databases(id) ON DELETE SET NULL
 );
 
 -- Database backups table
