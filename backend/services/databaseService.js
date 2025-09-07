@@ -1,6 +1,8 @@
 const databaseRepo = require('../repos/databaseRepo');
+const databaseConnectionManager = require('./databaseConnectionManager');
 const fs = require('fs');
 const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 
 const uploadDatabase = async (filePath, fileName) => {
   try {
@@ -31,7 +33,39 @@ const getAllDatabases = async (limit = 50, offset = 0, status = null) => {
 };
 
 const createDatabase = async (databaseData) => {
-  return await databaseRepo.createDatabase(databaseData);
+  try {
+    // If it's a new database creation request
+    if (databaseData.name && !databaseData.file_path) {
+      // Create the actual MySQL database
+      const dbInfo = await databaseConnectionManager.createDatabase(
+        databaseData.name, 
+        {
+          charset: databaseData.charset || 'utf8mb4',
+          collation: databaseData.collation || 'utf8mb4_unicode_ci'
+        }
+      );
+
+      // Store database info in our metadata table
+      const storedDbInfo = await databaseRepo.createDatabase({
+        id: dbInfo.id,
+        name: dbInfo.name,
+        description: databaseData.description || '',
+        type: 'mysql',
+        status: 'active',
+        connection_string: null,
+        file_path: null,
+        file_size: null
+      });
+
+      return storedDbInfo;
+    } else {
+      // Handle file-based database creation
+      return await databaseRepo.createDatabase(databaseData);
+    }
+  } catch (error) {
+    console.error('Error creating database:', error);
+    throw error;
+  }
 };
 
 const getDatabaseById = async (id) => {
@@ -39,46 +73,63 @@ const getDatabaseById = async (id) => {
 };
 
 const getDatabaseSchema = async (id) => {
-  const database = await databaseRepo.getDatabaseById(id);
-  if (!database) {
-    return null;
+  try {
+    const database = await databaseRepo.getDatabaseById(id);
+    if (!database) {
+      return null;
+    }
+    
+    // If it's a MySQL database, get real schema
+    if (database.type === 'mysql') {
+      const schema = await databaseConnectionManager.getDatabaseSchema(database.name);
+      return {
+        database_id: id,
+        database_name: database.name,
+        ...schema,
+        extracted_at: new Date().toISOString()
+      };
+    }
+    
+    // For other database types, return basic info
+    return {
+      database_id: id,
+      database_name: database.name,
+      type: database.type,
+      status: database.status,
+      extracted_at: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('Error getting database schema:', error);
+    throw error;
   }
-  
-  // This would typically connect to the actual database and extract schema
-  // For now, we'll return a mock schema structure
-  return {
-    database_id: id,
-    database_name: database.name,
-    tables: [
-      {
-        name: 'example_table',
-        columns: [
-          { name: 'id', type: 'INTEGER', nullable: false, primary_key: true },
-          { name: 'name', type: 'VARCHAR(255)', nullable: true },
-          { name: 'created_at', type: 'TIMESTAMP', nullable: false }
-        ]
-      }
-    ],
-    extracted_at: new Date().toISOString()
-  };
 };
 
 const deleteDatabase = async (id) => {
-  const database = await databaseRepo.getDatabaseById(id);
-  if (!database) {
-    return false;
-  }
-  
-  // Delete physical file if it exists
-  if (database.file_path && fs.existsSync(database.file_path)) {
-    try {
-      fs.unlinkSync(database.file_path);
-    } catch (error) {
-      console.error('Failed to delete database file:', error);
+  try {
+    const database = await databaseRepo.getDatabaseById(id);
+    if (!database) {
+      return false;
     }
+    
+    // If it's a MySQL database, drop it from MySQL server
+    if (database.type === 'mysql') {
+      await databaseConnectionManager.dropDatabase(database.name);
+    }
+    
+    // Delete physical file if it exists
+    if (database.file_path && fs.existsSync(database.file_path)) {
+      try {
+        fs.unlinkSync(database.file_path);
+      } catch (error) {
+        console.error('Failed to delete database file:', error);
+      }
+    }
+    
+    return await databaseRepo.deleteDatabase(id);
+  } catch (error) {
+    console.error('Error deleting database:', error);
+    throw error;
   }
-  
-  return await databaseRepo.deleteDatabase(id);
 };
 
 const createBackup = async (backupData) => {
@@ -116,6 +167,107 @@ const getDatabaseStats = async () => {
   return await databaseRepo.getDatabaseStats();
 };
 
+/**
+ * Execute SQL query on a specific database
+ */
+const executeQuery = async (databaseId, sqlQuery, params = []) => {
+  try {
+    const database = await databaseRepo.getDatabaseById(databaseId);
+    if (!database) {
+      throw new Error('Database not found');
+    }
+
+    if (database.type === 'mysql') {
+      return await databaseConnectionManager.executeQuery(database.name, sqlQuery, params);
+    } else {
+      throw new Error('Query execution not supported for this database type');
+    }
+  } catch (error) {
+    console.error('Error executing query:', error);
+    throw error;
+  }
+};
+
+/**
+ * Import SQL file into a database
+ */
+const importSQLFile = async (databaseId, sqlContent) => {
+  try {
+    const database = await databaseRepo.getDatabaseById(databaseId);
+    if (!database) {
+      throw new Error('Database not found');
+    }
+
+    if (database.type === 'mysql') {
+      return await databaseConnectionManager.importSQLFile(database.name, sqlContent);
+    } else {
+      throw new Error('SQL import not supported for this database type');
+    }
+  } catch (error) {
+    console.error('Error importing SQL file:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get database statistics
+ */
+const getDatabaseStatistics = async (databaseId) => {
+  try {
+    const database = await databaseRepo.getDatabaseById(databaseId);
+    if (!database) {
+      throw new Error('Database not found');
+    }
+
+    if (database.type === 'mysql') {
+      return await databaseConnectionManager.getDatabaseStats(database.name);
+    } else {
+      return {
+        database_name: database.name,
+        type: database.type,
+        status: database.status,
+        last_checked: new Date().toISOString()
+      };
+    }
+  } catch (error) {
+    console.error('Error getting database statistics:', error);
+    throw error;
+  }
+};
+
+/**
+ * Test database connection
+ */
+const testDatabaseConnection = async (databaseId) => {
+  try {
+    const database = await databaseRepo.getDatabaseById(databaseId);
+    if (!database) {
+      throw new Error('Database not found');
+    }
+
+    if (database.type === 'mysql') {
+      return await databaseConnectionManager.testConnection(database.name);
+    } else {
+      return true; // Assume file-based databases are always accessible
+    }
+  } catch (error) {
+    console.error('Error testing database connection:', error);
+    return false;
+  }
+};
+
+/**
+ * List all databases on the MySQL server
+ */
+const listServerDatabases = async () => {
+  try {
+    return await databaseConnectionManager.listDatabases();
+  } catch (error) {
+    console.error('Error listing server databases:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   uploadDatabase,
   getAllDatabases,
@@ -124,5 +276,10 @@ module.exports = {
   getDatabaseSchema,
   deleteDatabase,
   createBackup,
-  getDatabaseStats
+  getDatabaseStats,
+  executeQuery,
+  importSQLFile,
+  getDatabaseStatistics,
+  testDatabaseConnection,
+  listServerDatabases
 };

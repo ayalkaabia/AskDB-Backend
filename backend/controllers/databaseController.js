@@ -90,7 +90,7 @@ const getAllDatabases = async (req, res) => {
 
 const createDatabase = async (req, res) => {
   try {
-    const { name, description, type = 'sqlite', connection_string } = req.body;
+    const { name, description, type = 'mysql', charset, collation } = req.body;
     
     if (!name) {
       return res.status(400).json({
@@ -99,11 +99,20 @@ const createDatabase = async (req, res) => {
       });
     }
 
+    // Validate database name
+    if (!/^[a-zA-Z_][a-zA-Z0-9_$]*$/.test(name)) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Database name must start with a letter or underscore and contain only alphanumeric characters, underscores, and dollar signs'
+      });
+    }
+
     const databaseData = {
       name,
       description: description || '',
       type,
-      connection_string: connection_string || null
+      charset: charset || 'utf8mb4',
+      collation: collation || 'utf8mb4_unicode_ci'
     };
 
     const newDatabase = await databaseService.createDatabase(databaseData);
@@ -117,7 +126,7 @@ const createDatabase = async (req, res) => {
     console.error('Create database error:', error);
     res.status(500).json({
       error: 'Internal Server Error',
-      message: 'Failed to create database'
+      message: error.message || 'Failed to create database'
     });
   }
 };
@@ -285,6 +294,160 @@ const getDatabaseStats = async (req, res) => {
   }
 };
 
+/**
+ * Execute SQL query on a specific database
+ */
+const executeQuery = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { sql_query, params = [] } = req.body;
+    
+    if (!id) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Database ID is required'
+      });
+    }
+
+    if (!sql_query) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'SQL query is required'
+      });
+    }
+
+    const result = await databaseService.executeQuery(id, sql_query, params);
+    
+    res.status(200).json({
+      message: 'Query executed successfully',
+      result: result
+    });
+
+  } catch (error) {
+    console.error('Execute query error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: error.message || 'Failed to execute query'
+    });
+  }
+};
+
+/**
+ * Import SQL file into a database
+ */
+const importSQLFile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { sql_content } = req.body;
+    
+    if (!id) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Database ID is required'
+      });
+    }
+
+    if (!sql_content) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'SQL content is required'
+      });
+    }
+
+    const result = await databaseService.importSQLFile(id, sql_content);
+    
+    res.status(200).json({
+      message: 'SQL file imported successfully',
+      result: result
+    });
+
+  } catch (error) {
+    console.error('Import SQL file error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: error.message || 'Failed to import SQL file'
+    });
+  }
+};
+
+/**
+ * Get database statistics
+ */
+const getDatabaseStatistics = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!id) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Database ID is required'
+      });
+    }
+
+    const stats = await databaseService.getDatabaseStatistics(id);
+    
+    res.status(200).json(stats);
+
+  } catch (error) {
+    console.error('Get database statistics error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: error.message || 'Failed to retrieve database statistics'
+    });
+  }
+};
+
+/**
+ * Test database connection
+ */
+const testDatabaseConnection = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!id) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Database ID is required'
+      });
+    }
+
+    const isConnected = await databaseService.testDatabaseConnection(id);
+    
+    res.status(200).json({
+      message: isConnected ? 'Database connection successful' : 'Database connection failed',
+      connected: isConnected
+    });
+
+  } catch (error) {
+    console.error('Test database connection error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: error.message || 'Failed to test database connection'
+    });
+  }
+};
+
+/**
+ * List all databases on the MySQL server
+ */
+const listServerDatabases = async (req, res) => {
+  try {
+    const databases = await databaseService.listServerDatabases();
+    
+    res.status(200).json({
+      message: 'Server databases retrieved successfully',
+      databases: databases
+    });
+
+  } catch (error) {
+    console.error('List server databases error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: error.message || 'Failed to list server databases'
+    });
+  }
+};
+
 module.exports = {
   uploadDatabase,
   getAllDatabases,
@@ -293,5 +456,10 @@ module.exports = {
   getDatabaseSchema,
   deleteDatabase,
   createBackup,
-  getDatabaseStats
+  getDatabaseStats,
+  executeQuery,
+  importSQLFile,
+  getDatabaseStatistics,
+  testDatabaseConnection,
+  listServerDatabases
 };

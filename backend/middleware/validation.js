@@ -22,11 +22,29 @@ const validateQuery = (req, res, next) => {
     });
   }
 
-  if (prompt.length > 1000) {
+  if (prompt.length > 2000) {
     return res.status(400).json({
       error: 'Bad Request',
-      message: 'Prompt is too long (max 1000 characters)'
+      message: 'Prompt is too long (max 2000 characters)'
     });
+  }
+
+  // Check for potentially malicious patterns
+  const suspiciousPatterns = [
+    /<script/i,
+    /javascript:/i,
+    /on\w+\s*=/i,
+    /eval\s*\(/i,
+    /exec\s*\(/i
+  ];
+  
+  for (const pattern of suspiciousPatterns) {
+    if (pattern.test(prompt)) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Prompt contains potentially malicious content'
+      });
+    }
   }
 
   next();
@@ -63,17 +81,39 @@ const validateSQL = (req, res, next) => {
     });
   }
 
-  // Basic SQL injection prevention (very basic - in production, use proper SQL parsing)
-  const dangerousKeywords = ['DROP', 'DELETE', 'TRUNCATE', 'ALTER', 'CREATE', 'INSERT', 'UPDATE'];
+  // Enhanced SQL validation - allow DDL/DML operations but check for dangerous patterns
+  const dangerousPatterns = [
+    'GRANT', 'REVOKE', 'EXECUTE', 'EXEC', 'INTO OUTFILE', 
+    'INTO DUMPFILE', 'LOAD_FILE', 'BENCHMARK', 'SLEEP',
+    'UNION SELECT', '--', '/*', '*/', 'XP_', 'SP_'
+  ];
+  
   const upperSQL = sql.toUpperCase();
   
-  for (const keyword of dangerousKeywords) {
-    if (upperSQL.includes(keyword)) {
+  for (const pattern of dangerousPatterns) {
+    if (upperSQL.includes(pattern)) {
       return res.status(400).json({
         error: 'Bad Request',
-        message: `SQL query contains forbidden keyword: ${keyword}`
+        message: `SQL query contains potentially dangerous pattern: ${pattern}`
       });
     }
+  }
+
+  // Ensure it's a valid SQL statement
+  const validStarters = [
+    'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 
+    'ALTER', 'TRUNCATE', 'SHOW', 'DESCRIBE', 'EXPLAIN'
+  ];
+  
+  const startsWithValid = validStarters.some(starter => 
+    upperSQL.startsWith(starter)
+  );
+  
+  if (!startsWithValid) {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'SQL query must start with a valid SQL statement'
+    });
   }
 
   next();

@@ -67,18 +67,21 @@ class AIService {
     return `You are an expert SQL developer specializing in MySQL. Your task is to convert natural language queries into accurate, safe, and efficient MySQL SQL queries.
 
 IMPORTANT RULES:
-1. Only generate SELECT queries - no INSERT, UPDATE, DELETE, DROP, or other destructive operations
+1. Generate any type of MySQL query based on user request (SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, etc.)
 2. Use proper MySQL syntax with backticks for table and column names
-3. Always include LIMIT clauses for large result sets (default LIMIT 100)
+3. For SELECT queries, always include LIMIT clauses for large result sets (default LIMIT 100)
 4. Use appropriate JOINs when querying related tables
 5. Include proper WHERE clauses for filtering
 6. Use aggregate functions (COUNT, SUM, AVG, etc.) when appropriate
 7. Order results logically (ORDER BY) when relevant
 8. Handle NULL values appropriately
 9. Use proper date/time functions for date comparisons
-10. Return only the SQL query, no explanations or markdown formatting
+10. For CREATE DATABASE statements, use proper naming conventions
+11. For CREATE TABLE statements, include appropriate data types, constraints, and indexes
+12. For INSERT/UPDATE/DELETE operations, ensure data integrity and proper WHERE clauses
+13. Return only the SQL query, no explanations or markdown formatting
 
-The user will provide a database schema and a natural language query. Generate the most appropriate SQL query based on the schema provided.`;
+The user will provide a database schema and a natural language query. Generate the most appropriate SQL query based on the schema provided and user requirements.`;
   }
 
   /**
@@ -89,7 +92,7 @@ The user will provide a database schema and a natural language query. Generate t
 
 User Query: "${naturalLanguageQuery}"
 
-Generate a MySQL SELECT query that answers this question. Return only the SQL query, no explanations.`;
+Generate the appropriate MySQL query to fulfill this request. Return only the SQL query, no explanations.`;
   }
 
   /**
@@ -102,9 +105,18 @@ Generate a MySQL SELECT query that answers this question. Return only the SQL qu
     // Remove any leading/trailing whitespace
     sql = sql.trim();
     
-    // Ensure it starts with SELECT
-    if (!sql.toUpperCase().startsWith('SELECT')) {
-      throw new Error('Generated query does not start with SELECT');
+    // Ensure it starts with a valid SQL statement
+    const validStarters = [
+      'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 
+      'ALTER', 'TRUNCATE', 'SHOW', 'DESCRIBE', 'EXPLAIN'
+    ];
+    
+    const startsWithValid = validStarters.some(starter => 
+      sql.toUpperCase().startsWith(starter)
+    );
+    
+    if (!startsWithValid) {
+      throw new Error('Generated query does not start with a valid SQL statement');
     }
     
     return sql;
@@ -116,37 +128,29 @@ Generate a MySQL SELECT query that answers this question. Return only the SQL qu
   validateGeneratedSQL(sqlQuery) {
     const upperSQL = sqlQuery.toUpperCase();
     
-    // Check for forbidden operations
-    const forbiddenKeywords = [
-      'INSERT', 'UPDATE', 'DELETE', 'DROP', 'TRUNCATE', 'ALTER', 
-      'CREATE', 'GRANT', 'REVOKE', 'EXECUTE', 'EXEC'
+    // Check for potentially dangerous operations (but allow them with proper context)
+    const dangerousKeywords = [
+      'GRANT', 'REVOKE', 'EXECUTE', 'EXEC', 'INTO OUTFILE', 
+      'INTO DUMPFILE', 'LOAD_FILE', 'BENCHMARK', 'SLEEP'
     ];
     
-    for (const keyword of forbiddenKeywords) {
+    for (const keyword of dangerousKeywords) {
       if (upperSQL.includes(keyword)) {
         return {
           isValid: false,
-          error: `Forbidden operation detected: ${keyword}`
+          error: `Potentially dangerous operation detected: ${keyword}`
         };
       }
-    }
-    
-    // Ensure it's a SELECT query
-    if (!upperSQL.startsWith('SELECT')) {
-      return {
-        isValid: false,
-        error: 'Query must start with SELECT'
-      };
     }
     
     // Check for potential SQL injection patterns
     const suspiciousPatterns = [
       'UNION SELECT',
-      'INTO OUTFILE',
-      'INTO DUMPFILE',
-      'LOAD_FILE',
-      'BENCHMARK',
-      'SLEEP'
+      '--',
+      '/*',
+      '*/',
+      'XP_',
+      'SP_'
     ];
     
     for (const pattern of suspiciousPatterns) {
@@ -156,6 +160,23 @@ Generate a MySQL SELECT query that answers this question. Return only the SQL qu
           error: `Suspicious pattern detected: ${pattern}`
         };
       }
+    }
+    
+    // Ensure it's a valid SQL statement
+    const validStarters = [
+      'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 
+      'ALTER', 'TRUNCATE', 'SHOW', 'DESCRIBE', 'EXPLAIN'
+    ];
+    
+    const startsWithValid = validStarters.some(starter => 
+      upperSQL.startsWith(starter)
+    );
+    
+    if (!startsWithValid) {
+      return {
+        isValid: false,
+        error: 'Query must start with a valid SQL statement'
+      };
     }
     
     return { isValid: true };
@@ -171,10 +192,13 @@ Generate a MySQL SELECT query that answers this question. Return only the SQL qu
         messages: [{ role: 'user', content: 'Hello' }],
         max_tokens: 10,
       });
-      return completion.choices[0]?.message?.content ? true : false;
+      if (!completion.choices[0]?.message?.content) {
+        throw new Error('No response from OpenAI API');
+      }
+      return true;
     } catch (error) {
       console.error('OpenAI connection test failed:', error);
-      return false;
+      throw new Error(`AI connection test failed: ${error.message}`);
     }
   }
 

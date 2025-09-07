@@ -8,14 +8,19 @@ class HistoryRepository {
       const id = uuidv4();
       const resultCount = Array.isArray(queryData.results) ? queryData.results.length : 0;
       
+      // Determine query type from SQL
+      const queryType = this.determineQueryType(queryData.sql);
+      
       await connection.execute(
-        'INSERT INTO query_history (id, prompt, sql_query, results, result_count) VALUES (?, ?, ?, ?, ?)',
+        'INSERT INTO `query_history` (id, prompt, sql_query, results, result_count, database_id, query_type) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [
           id,
           queryData.prompt,
           queryData.sql,
           JSON.stringify(queryData.results),
-          resultCount
+          resultCount,
+          queryData.database_id || null,
+          queryType
         ]
       );
       
@@ -24,12 +29,29 @@ class HistoryRepository {
         prompt: queryData.prompt,
         sql: queryData.sql,
         results: queryData.results,
+        database_id: queryData.database_id || null,
+        query_type: queryType,
         timestamp: new Date().toISOString(),
         resultCount
       };
     } finally {
       connection.release();
     }
+  }
+
+  determineQueryType(sql) {
+    if (!sql) return 'OTHER';
+    
+    const upperSQL = sql.toUpperCase().trim();
+    if (upperSQL.startsWith('SELECT')) return 'SELECT';
+    if (upperSQL.startsWith('INSERT')) return 'INSERT';
+    if (upperSQL.startsWith('UPDATE')) return 'UPDATE';
+    if (upperSQL.startsWith('DELETE')) return 'DELETE';
+    if (upperSQL.startsWith('CREATE')) return 'CREATE';
+    if (upperSQL.startsWith('DROP')) return 'DROP';
+    if (upperSQL.startsWith('ALTER')) return 'ALTER';
+    
+    return 'OTHER';
   }
 
   async getHistory(limit = 50, offset = 0) {
@@ -40,7 +62,7 @@ class HistoryRepository {
       offset = parseInt(offset, 10) || 0;
   
       const [rows] = await connection.query(
-        `SELECT * FROM query_history ORDER BY timestamp DESC LIMIT ${limit} OFFSET ${offset}`
+        `SELECT * FROM \`query_history\` ORDER BY timestamp DESC LIMIT ${limit} OFFSET ${offset}`
       );
       
       return rows.map(row => ({
@@ -60,7 +82,7 @@ class HistoryRepository {
     const connection = await pool.getConnection();
     try {
       const [rows] = await connection.execute(
-        'SELECT * FROM query_history WHERE id = ?',
+        'SELECT * FROM `query_history` WHERE id = ?',
         [id]
       );
       
@@ -83,7 +105,7 @@ class HistoryRepository {
     try {
       const searchTerm = `%${query}%`;
       const [rows] = await connection.execute(
-        'SELECT * FROM query_history WHERE prompt LIKE ? OR sql_query LIKE ? ORDER BY timestamp DESC LIMIT ? OFFSET ?',
+        'SELECT * FROM `query_history` WHERE prompt LIKE ? OR sql_query LIKE ? ORDER BY timestamp DESC LIMIT ? OFFSET ?',
         [searchTerm, searchTerm, limit, offset]
       );
       
@@ -100,7 +122,7 @@ class HistoryRepository {
     const connection = await pool.getConnection();
     try {
       const [result] = await connection.execute(
-        'DELETE FROM query_history WHERE id = ?',
+        'DELETE FROM `query_history` WHERE id = ?',
         [id]
       );
       
@@ -143,7 +165,7 @@ class HistoryRepository {
       values.push(id);
       
       const [result] = await connection.execute(
-        `UPDATE query_history SET ${fields.join(', ')} WHERE id = ?`,
+        `UPDATE \`query_history\` SET ${fields.join(', ')} WHERE id = ?`,
         values
       );
       
@@ -156,7 +178,7 @@ class HistoryRepository {
   async clearHistory() {
     const connection = await pool.getConnection();
     try {
-      await connection.execute('DELETE FROM query_history');
+      await connection.execute('DELETE FROM `query_history`');
       return true;
     } finally {
       connection.release();
@@ -173,7 +195,7 @@ class HistoryRepository {
           AVG(result_count) as average_results_per_query,
           MAX(timestamp) as last_query_time,
           MIN(timestamp) as first_query_time
-        FROM query_history
+        FROM \`query_history\`
       `);
       
       return rows[0] || {
