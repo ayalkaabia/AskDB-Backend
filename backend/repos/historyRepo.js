@@ -77,24 +77,6 @@ class HistoryRepository {
     }
   }
 
-  async getHistoryByUserId(userId, limit = 50, offset = 0) {
-    const connection = await pool.getConnection();
-    try {
-      // Since user_id column doesn't exist in current schema, return all history
-      // This is a temporary fix until the schema is updated
-      const [rows] = await connection.execute(
-        'SELECT * FROM query_history ORDER BY timestamp DESC LIMIT ? OFFSET ?',
-        [limit, offset]
-      );
-      
-      return rows.map(row => ({
-        ...row,
-        results: row.results ? JSON.parse(row.results) : null
-      }));
-    } finally {
-      connection.release();
-    }
-  }
 
   async searchHistory(query, limit = 50, offset = 0) {
     const connection = await pool.getConnection();

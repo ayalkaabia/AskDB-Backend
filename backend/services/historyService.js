@@ -12,9 +12,6 @@ const getHistoryById = async (id) => {
   return await historyRepo.getHistoryById(id);
 };
 
-const getHistoryByUserId = async (userId, limit = 50, offset = 0) => {
-  return await historyRepo.getHistoryByUserId(userId, limit, offset);
-};
 
 const searchHistory = async (query, limit = 50, offset = 0) => {
   return await historyRepo.searchHistory(query, limit, offset);
@@ -40,7 +37,6 @@ module.exports = {
   addToHistory,
   getHistory,
   getHistoryById,
-  getHistoryByUserId,
   searchHistory,
   deleteHistoryById,
   updateHistoryById,

@@ -132,9 +132,6 @@ backend/
 
 ## 📚 API Endpoints
 
-### Authentication
-- `POST /auth/register` - Register new user
-- `POST /auth/login` - User login
 
 ### Database Management
 - `POST /upload-db` - Upload database file
@@ -160,30 +157,12 @@ backend/
 - `PUT /history/:id` - Update history item
 - `GET /history/stats` - Get history statistics
 
-### User Management
-- `GET /users` - List all users
-- `GET /users/:id` - Get user details
-- `PUT /users/:id` - Update user
-- `DELETE /users/:id` - Delete user
-
-### Permission Management
-- `GET /permissions` - List all permissions
-- `POST /permissions` - Create permission
-- `GET /permissions/:id` - Get permission details
-- `PUT /permissions/:id` - Update permission
-- `DELETE /permissions/:id` - Delete permission
-- `GET /users/:userId/permissions` - Get user permissions
-- `POST /users/permissions` - Assign permission
-- `DELETE /users/:userId/permissions/:permissionId` - Remove permission
 
 ### Export
 - `GET /export` - Export query results
 
 ## 🔐 Security Features
 
-- **JWT Authentication**: Secure token-based authentication
-- **Password Hashing**: Bcrypt password encryption
-- **Role-based Access Control**: Granular permission system
 - **Input Validation**: Comprehensive request validation
 - **Rate Limiting**: API abuse prevention
 - **SQL Injection Protection**: Parameterized queries
@@ -208,9 +187,6 @@ npm run interactive
 ## 📊 Database Schema
 
 The system uses the following main tables:
-- `users` - User accounts and profiles
-- `permissions` - System permissions
-- `user_permissions` - User-permission assignments
 - `databases` - Database connections and files
 - `database_backups` - Database backup records
 - `query_history` - Query execution history

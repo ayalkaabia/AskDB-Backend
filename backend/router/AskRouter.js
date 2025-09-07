@@ -10,9 +10,6 @@ const queryController = require('../controllers/queryController');
 const historyController = require('../controllers/historyController');
 const exportController = require('../controllers/exportController');
 
-// Import routers
-const userRouter = require('./userRouter');
-const permissionRouter = require('./permissionRouter');
 
 // Import middleware
 const { validateQuery, validateSQL } = require('../middleware/validation');
@@ -111,8 +108,6 @@ router.get('/history', historyController.getHistory);
 // GET /history/:id - Get specific history item by ID
 router.get('/history/:id', historyController.getHistoryById);
 
-// GET /history/user/:userId - Get history by specific user
-router.get('/history/user/:userId', historyController.getHistoryByUserId);
 
 // GET /history/search - Search history by keyword
 router.get('/history/search', historyController.searchHistory);
@@ -129,10 +124,6 @@ router.get('/history/stats', historyController.getHistoryStats);
 // GET /export - Export query results
 router.get('/export', exportController.exportResults);
 
-// Use additional routers
-router.use('/auth', userRouter);
-router.use('/users', userRouter);
-router.use('/permissions', permissionRouter);
 
 module.exports = router;
 
