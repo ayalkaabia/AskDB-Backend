@@ -53,9 +53,24 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Validate required environment variables
+const validateEnvironment = () => {
+  const required = ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    console.error('❌ Missing required environment variables:', missing.join(', '));
+    console.error('Please check your .env file');
+    process.exit(1);
+  }
+};
+
 // Initialize database and start server
 const startServer = async () => {
   try {
+    // Validate environment variables
+    validateEnvironment();
+    
     // Test database connection
     const dbConnected = await testConnection();
     if (!dbConnected) {
@@ -79,5 +94,16 @@ const startServer = async () => {
 };
 
 startServer();
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received, shutting down gracefully');
+  process.exit(0);
+});
 
 module.exports = app;

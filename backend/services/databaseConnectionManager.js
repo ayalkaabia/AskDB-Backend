@@ -123,6 +123,11 @@ class DatabaseConnectionManager {
     } catch (error) {
       console.error(`Error executing query on ${databaseName}:`, error);
       throw new Error(`Query execution failed: ${error.message}`);
+    } finally {
+      // Don't close persistent connections, but ensure proper error handling
+      if (connection && connection._protocol && connection._protocol._connectionState === 'disconnected') {
+        this.connections.delete(databaseName);
+      }
     }
   }
 
