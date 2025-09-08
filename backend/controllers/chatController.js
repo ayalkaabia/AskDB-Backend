@@ -40,8 +40,8 @@ const processChat = async (req, res) => {
     }
 
     await historyService.addToHistory({
-      prompt: chatRequest.message,
-      sql: aiResponse.sql || null,
+      prompt: chatRequest.message || 'File upload',
+      sql: aiResponse.sql || '',
       results: aiResponse.results || null,
       database_id: aiResponse.database_id || null,
       query_type: aiResponse.query_type || 'OTHER'

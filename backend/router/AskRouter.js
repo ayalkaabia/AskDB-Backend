@@ -36,10 +36,11 @@ const upload = multer({
   storage: storage,
   fileFilter: (req, file, cb) => {
     if (file.mimetype === 'application/octet-stream' || 
-        file.originalname.endsWith('.sql')) {
+        file.originalname.endsWith('.sql') || 
+        file.originalname.endsWith('.db')) {
       cb(null, true);
     } else {
-      cb(new Error('Only .sql files are allowed'), false);
+      cb(new Error('Only .sql and .db files are allowed'), false);
     }
   },
   limits: {

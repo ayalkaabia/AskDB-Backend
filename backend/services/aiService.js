@@ -320,7 +320,17 @@ Respond naturally and call functions when needed to help the user.`;
                 type: 'object',
                 properties: {
                   name: { type: 'string' },
-                  columns: { type: 'array' }
+                  columns: { 
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        name: { type: 'string' },
+                        type: { type: 'string' },
+                        constraints: { type: 'string' }
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -536,9 +546,10 @@ Respond naturally and call functions when needed to help the user.`;
   async executeCreateDatabaseFromFile(args, file) {
     const databaseService = require('./databaseService');
     
+    const filename = args.filename || file?.originalname || 'uploaded_database';
     const dbData = {
-      name: args.filename.replace(/\.[^/.]+$/, ""),
-      description: `Database created from file: ${args.filename}`,
+      name: filename.replace(/\.[^/.]+$/, ""),
+      description: `Database created from file: ${filename}`,
       type: 'mysql'
     };
 
