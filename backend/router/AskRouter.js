@@ -10,10 +10,13 @@ const queryController = require('../controllers/queryController');
 const historyController = require('../controllers/historyController');
 const exportController = require('../controllers/exportController');
 const chatController = require('../controllers/chatController');
+const userController = require('../controllers/userController');
 
 
 // Import middleware
-const { validateQuery, validateSQL } = require('../middleware/validation');
+const { validateQuery, validateSQL, validateBody } = require('../middleware/validation');
+const { registerSchema, loginSchema } = require('../middleware/schemas');
+const auth = require('../middleware/auth');
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, '../../uploads');
@@ -65,7 +68,7 @@ router.get('/chat/conversations', chatController.listConversations);
 // API ROUTES
 // =============================================================================
 
-// GET / - API root endpoint
+// GET / - API root endpoint (lists key endpoints for discoverability)
 router.get('/', (req, res) => {
   res.json({
     message: 'AskDB API is running',
@@ -108,7 +111,15 @@ router.get('/', (req, res) => {
       'GET /history/stats': 'Get history statistics',
       
       // Export
-      'GET /export': 'Export query results'
+      'GET /export': 'Export query results',
+
+      // Auth & User (JWT-based)
+      'POST /auth/register': 'Register new user',
+      'POST /auth/login': 'Login user',
+      'GET /users/me': 'Get current user profile',
+      'PUT /users/me': 'Update current user profile',
+
+      
     }
   });
 });
@@ -206,6 +217,17 @@ router.put('/history/:id', historyController.updateHistoryById);
 
 // GET /export - Export query results
 router.get('/export', exportController.exportResults);
+
+// =============================================================================
+// AUTH & USER ROUTES
+// =============================================================================
+
+router.post('/auth/register', validateBody(registerSchema), userController.register);
+router.post('/auth/login', validateBody(loginSchema), userController.login);
+router.get('/users/me', auth, userController.me);
+router.put('/users/me', auth, userController.updateMe);
+
+// 
 
 
 module.exports = router;

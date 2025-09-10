@@ -119,7 +119,23 @@ const validateSQL = (req, res, next) => {
   next();
 };
 
+// Generic Zod validation middleware factory
+// Usage: router.post('/auth/register', validateBody(registerSchema), handler)
+const validateBody = (schema) => (req, res, next) => {
+  try {
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+    }
+    req.validated = parsed.data;
+    return next();
+  } catch (e) {
+    return res.status(400).json({ error: 'Invalid request body' });
+  }
+};
+
 module.exports = {
   validateQuery,
-  validateSQL
+  validateSQL,
+  validateBody
 };
