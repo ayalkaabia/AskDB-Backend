@@ -222,8 +222,19 @@ router.get('/export', exportController.exportResults);
 // AUTH & USER ROUTES
 // =============================================================================
 
-router.post('/auth/register', validateBody(registerSchema), userController.register);
-router.post('/auth/login', validateBody(loginSchema), userController.login);
+// Rate limiting for auth endpoints
+const rateLimit = require('express-rate-limit');
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 requests per windowMs
+  message: { error: 'Too many authentication attempts, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+router.post('/auth/register', authLimiter, validateBody(registerSchema), userController.register);
+router.post('/auth/login', authLimiter, validateBody(loginSchema), userController.login);
 router.get('/users/me', auth, userController.me);
 router.put('/users/me', auth, userController.updateMe);
 

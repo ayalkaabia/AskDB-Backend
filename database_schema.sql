@@ -1,6 +1,15 @@
 -- AskDB Database Schema
 -- This file contains all the tables needed for the expanded system
 
+-- Users table for authentication
+CREATE TABLE IF NOT EXISTS users (
+    id VARCHAR(36) PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
 
 -- Databases table (created first to avoid foreign key issues)
 CREATE TABLE IF NOT EXISTS databases (
@@ -58,4 +67,8 @@ CREATE INDEX idx_databases_status ON databases(status);
 CREATE INDEX idx_databases_type ON databases(type);
 CREATE INDEX idx_databases_uploaded_at ON databases(uploaded_at);
 CREATE INDEX idx_databases_name ON databases(name);
+
+-- Users table indexes for performance
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_created_at ON users(created_at);
 

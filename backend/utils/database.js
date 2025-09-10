@@ -58,50 +58,7 @@ const initializeDatabase = async () => {
       )
     `);
 
-    // Users table
-    await connection.execute(`
-      CREATE TABLE IF NOT EXISTS users (
-        id VARCHAR(36) PRIMARY KEY,
-        email VARCHAR(255) NOT NULL UNIQUE,
-        password_hash VARCHAR(255) NOT NULL,
-        name VARCHAR(255) NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Portfolios table
-    await connection.execute(`
-      CREATE TABLE IF NOT EXISTS portfolios (
-        id VARCHAR(36) PRIMARY KEY,
-        user_id VARCHAR(36) NOT NULL,
-        title VARCHAR(255) NOT NULL,
-        bio TEXT NULL,
-        website VARCHAR(255) NULL,
-        location VARCHAR(255) NULL,
-        avatar_url VARCHAR(500) NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        CONSTRAINT fk_portfolios_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-      )
-    `);
-
-    // Portfolio items table
-    await connection.execute(`
-      CREATE TABLE IF NOT EXISTS portfolio_items (
-        id VARCHAR(36) PRIMARY KEY,
-        portfolio_id VARCHAR(36) NOT NULL,
-        title VARCHAR(255) NOT NULL,
-        description TEXT NULL,
-        link VARCHAR(500) NULL,
-        image_url VARCHAR(500) NULL,
-        tags JSON NULL,
-        sort_order INT DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        CONSTRAINT fk_items_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE
-      )
-    `);
+    // Users table is now defined in database_schema.sql
 
     connection.release();
     console.log('✅ Database tables initialized');

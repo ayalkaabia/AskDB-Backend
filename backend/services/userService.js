@@ -10,21 +10,27 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 // Register a new user if email is free, then return a sanitized user
 const registerUser = async ({ email, password, name }) => {
-  const existing = await userRepo.findUserByEmail(email);
+  // Normalize email to lowercase and trim
+  const normalizedEmail = email.toLowerCase().trim();
+  
+  const existing = await userRepo.findUserByEmail(normalizedEmail);
   if (existing) {
     const error = new Error('Email already registered');
     error.status = 409;
     throw error;
   }
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, 12); // Increased salt rounds for better security
   const id = uuidv4();
-  const user = await userRepo.createUser({ id, email, passwordHash, name });
+  const user = await userRepo.createUser({ id, email: normalizedEmail, passwordHash, name });
   return sanitizeUser(user);
 };
 
 // Verify credentials and issue a signed JWT for session auth
 const loginUser = async ({ email, password }) => {
-  const user = await userRepo.findUserByEmail(email);
+  // Normalize email to lowercase and trim
+  const normalizedEmail = email.toLowerCase().trim();
+  
+  const user = await userRepo.findUserByEmail(normalizedEmail);
   if (!user) {
     const error = new Error('Invalid credentials');
     error.status = 401;

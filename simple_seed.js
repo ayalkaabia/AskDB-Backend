@@ -105,6 +105,20 @@ async function simpleSeed() {
         `);
         console.log('  ✅ Created database_backups table');
 
+        // Create users table
+        console.log('  Creating users table...');
+        await connection.execute(`
+            CREATE TABLE IF NOT EXISTS \`users\` (
+                id VARCHAR(36) PRIMARY KEY,
+                email VARCHAR(255) NOT NULL UNIQUE,
+                password_hash VARCHAR(255) NOT NULL,
+                name VARCHAR(100),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('  ✅ Created users table');
+
         // Create indexes
         console.log('\n🔍 Creating indexes...');
         const indexes = [
@@ -112,7 +126,9 @@ async function simpleSeed() {
             'CREATE INDEX idx_query_history_database_id ON `query_history`(database_id)',
             'CREATE INDEX idx_query_history_query_type ON `query_history`(query_type)',
             'CREATE INDEX idx_databases_name ON `databases`(name)',
-            'CREATE INDEX idx_databases_status ON `databases`(status)'
+            'CREATE INDEX idx_databases_status ON `databases`(status)',
+            'CREATE INDEX idx_users_email ON `users`(email)',
+            'CREATE INDEX idx_users_created_at ON `users`(created_at)'
         ];
 
         for (const indexSQL of indexes) {
