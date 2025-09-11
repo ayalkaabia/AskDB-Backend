@@ -28,8 +28,8 @@ const uploadDatabase = async (filePath, fileName, userId) => {
   }
 };
 
-const getAllDatabases = async (limit = 50, offset = 0, status = null) => {
-  return await databaseRepo.getAllDatabases(limit, offset, status);
+const getAllDatabases = async (userId, limit = 50, offset = 0, status = null) => {
+  return await databaseRepo.getAllDatabases(userId, limit, offset, status);
 };
 
 const getUserDatabases = async (userId, limit = 50, offset = 0) => {
@@ -63,7 +63,8 @@ const createDatabase = async (databaseData) => {
         status: 'active',
         connection_string: null,
         file_path: null,
-        file_size: null
+        file_size: null,
+        user_id: databaseData.user_id
       });
 
       return storedDbInfo;
@@ -79,9 +80,9 @@ const createDatabase = async (databaseData) => {
 
 
 
-const getDatabaseSchema = async (id) => {
+const getDatabaseSchema = async (id, userId) => {
   try {
-    const database = await databaseRepo.getDatabaseById(id);
+    const database = await databaseRepo.getDatabaseById(id, userId);
     if (!database) {
       return null;
     }

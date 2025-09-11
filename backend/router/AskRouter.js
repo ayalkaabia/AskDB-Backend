@@ -6,17 +6,10 @@ const fs = require('fs');
 
 // Import controllers
 const databaseController = require('../controllers/databaseController');
-const queryController = require('../controllers/queryController');
-const historyController = require('../controllers/historyController');
 const exportController = require('../controllers/exportController');
-const chatController = require('../controllers/chatController');
-const conversationController = require('../controllers/conversationController');
-const userController = require('../controllers/userController');
 
 
 // Import middleware
-const { validateQuery, validateSQL, validateBody } = require('../middleware/validation');
-const { registerSchema, loginSchema } = require('../middleware/schemas');
 const auth = require('../middleware/auth');
 
 // Create uploads directory if it doesn't exist
@@ -52,37 +45,6 @@ const upload = multer({
   }
 });
 
-// =============================================================================
-// CHAT ROUTES (Require Authentication)
-// =============================================================================
-
-// POST /chat - Main chat endpoint
-router.post('/chat', auth, upload.single('file'), chatController.processChat);
-
-// GET /chat/history/:conversation_id - Get conversation history
-router.get('/chat/history/:conversation_id', auth, chatController.getConversationHistory);
-
-// GET /chat/conversations - List user's conversations
-router.get('/chat/conversations', auth, chatController.listConversations);
-
-// =============================================================================
-// CONVERSATION MANAGEMENT ROUTES (Require Authentication)
-// =============================================================================
-
-// POST /conversations - Create new conversation
-router.post('/conversations', auth, conversationController.createConversation);
-
-// GET /conversations - Get user's conversations
-router.get('/conversations', auth, conversationController.getUserConversations);
-
-// GET /conversations/:id - Get specific conversation
-router.get('/conversations/:id', auth, conversationController.getConversation);
-
-// PUT /conversations/:id - Update conversation title
-router.put('/conversations/:id', auth, conversationController.updateConversationTitle);
-
-// DELETE /conversations/:id - Delete conversation
-router.delete('/conversations/:id', auth, conversationController.deleteConversation);
 
 // =============================================================================
 // API ROUTES
@@ -121,13 +83,6 @@ router.get('/', (req, res) => {
       'GET /databases/:id/test': 'Test database connection',
       'GET /databases/server/list': 'List all databases on MySQL server',
       
-      // Query Operations
-      'POST /query': 'Submit natural language query',
-      'POST /run-sql': 'Execute raw SQL query',
-      'POST /create-database': 'Create database from natural language prompt',
-      'POST /execute-multiple': 'Execute multiple SQL queries',
-      'GET /schema': 'Get current database schema',
-      'GET /test-ai': 'Test AI connection',
       
       // History Management
       'GET /history': 'Get query history',
@@ -141,8 +96,8 @@ router.get('/', (req, res) => {
       'GET /export': 'Export query results',
 
       // Auth & User (JWT-based)
-      'POST /auth/register': 'Register new user',
-      'POST /auth/login': 'Login user',
+      'POST /users/auth/register': 'Register new user',
+      'POST /users/auth/login': 'Login user',
       'GET /users/me': 'Get current user profile',
       'PUT /users/me': 'Update current user profile',
 
@@ -194,49 +149,7 @@ router.get('/databases/server/list', databaseController.listServerDatabases);
 // POST /databases/:id/backup - Create backup of specific database
 router.post('/databases/:id/backup', databaseController.createBackup);
 
-// =============================================================================
-// QUERY OPERATIONS ROUTES
-// =============================================================================
 
-// POST /query - Submit natural language prompt
-router.post('/query', validateQuery, queryController.processQuery);
-
-// POST /create-database - Create database from natural language prompt
-router.post('/create-database', validateQuery, queryController.createDatabaseFromPrompt);
-
-// POST /run-sql - Execute raw SQL query
-router.post('/run-sql', validateSQL, queryController.runSQL);
-
-// POST /execute-multiple - Execute multiple SQL queries
-router.post('/execute-multiple', queryController.executeMultipleQueries);
-
-// GET /schema - Get current database schema
-router.get('/schema', queryController.getDatabaseSchema);
-
-// GET /test-ai - Test AI connection
-router.get('/test-ai', queryController.testAIConnection);
-
-// =============================================================================
-// HISTORY MANAGEMENT ROUTES
-// =============================================================================
-
-// GET /history - Get query history
-router.get('/history', historyController.getHistory);
-
-// GET /history/:id - Get specific history item by ID
-router.get('/history/:id', historyController.getHistoryById);
-
-// GET /history/search - Search history by keyword
-router.get('/history/search', historyController.searchHistory);
-
-// GET /history/stats - Get history statistics
-router.get('/history/stats', historyController.getHistoryStats);
-
-// DELETE /history/:id - Delete specific history item
-router.delete('/history/:id', historyController.deleteHistoryById);
-
-// PUT /history/:id - Update specific history item
-router.put('/history/:id', historyController.updateHistoryById);
 
 // =============================================================================
 // EXPORT ROUTES
@@ -245,25 +158,6 @@ router.put('/history/:id', historyController.updateHistoryById);
 // GET /export - Export query results
 router.get('/export', exportController.exportResults);
 
-// =============================================================================
-// AUTH & USER ROUTES
-// =============================================================================
-
-// Rate limiting for auth endpoints
-const rateLimit = require('express-rate-limit');
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // limit each IP to 5 requests per windowMs
-  message: { error: 'Too many authentication attempts, please try again later' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-router.post('/auth/register', authLimiter, validateBody(registerSchema), userController.register);
-router.post('/auth/login', authLimiter, validateBody(loginSchema), userController.login);
-router.get('/users/me', auth, userController.me);
-router.put('/users/me', auth, userController.updateMe);
 
 // 
 

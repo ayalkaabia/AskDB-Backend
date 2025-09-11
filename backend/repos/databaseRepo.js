@@ -44,19 +44,25 @@ class DatabaseRepository {
     }
   }
 
-  async getAllDatabases(limit = 50, offset = 0, status = null) {
+  async getAllDatabases(userId, limit = 50, offset = 0, status = null) {
     const connection = await pool.getConnection();
     try {
-      let query = 'SELECT * FROM `databases`';
-      let params = [];
+      let query = 'SELECT * FROM `databases` WHERE user_id = ?';
+      let params = [userId];
       
       if (status) {
-        query += ' WHERE status = ?';
+        query += ' AND status = ?';
         params.push(status);
       }
       
-      query += ' ORDER BY uploaded_at DESC LIMIT ? OFFSET ?';
-      params.push(limit, offset);
+      // Use string interpolation for LIMIT and OFFSET to avoid parameter binding issues
+      const limitInt = parseInt(limit);
+      const offsetInt = parseInt(offset);
+      query += ` ORDER BY uploaded_at DESC LIMIT ${limitInt} OFFSET ${offsetInt}`;
+      
+      console.log('getAllDatabases - Query:', query);
+      console.log('getAllDatabases - Params:', params);
+      console.log('getAllDatabases - Param types:', params.map(p => typeof p));
       
       const [rows] = await connection.execute(query, params);
       
@@ -71,20 +77,23 @@ class DatabaseRepository {
     try {
       const id = databaseData.id || uuidv4();
       
+      const params = [
+        id,
+        databaseData.user_id,
+        databaseData.name,
+        databaseData.description || null,
+        databaseData.type || 'mysql',
+        databaseData.connection_string || null,
+        databaseData.file_path || null,
+        databaseData.file_size || null,
+        databaseData.status || 'active',
+        databaseData.charset || 'utf8mb4',
+        databaseData.collation || 'utf8mb4_unicode_ci'
+      ];
+      
       await connection.execute(
-        'INSERT INTO `databases` (id, name, description, type, connection_string, file_path, file_size, status, charset, collation, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
-        [
-          id,
-          databaseData.name,
-          databaseData.description,
-          databaseData.type,
-          databaseData.connection_string,
-          databaseData.file_path,
-          databaseData.file_size,
-          databaseData.status || 'active',
-          databaseData.charset || 'utf8mb4',
-          databaseData.collation || 'utf8mb4_unicode_ci'
-        ]
+        'INSERT INTO `databases` (id, user_id, name, description, type, connection_string, file_path, file_size, status, charset, collation, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
+        params
       );
       
       return {

@@ -218,7 +218,7 @@ Generate the appropriate MySQL query to fulfill this request. Return only the SQ
    */
   async processChatRequest(chatRequest) {
     try {
-      const { message, file, conversation_id } = chatRequest;
+      const { message, file, conversation_id, user_id } = chatRequest;
       
       const systemPrompt = this.buildChatSystemPrompt();
       
@@ -247,7 +247,7 @@ Generate the appropriate MySQL query to fulfill this request. Return only the SQ
       }
 
       if (response.function_call) {
-        return await this.handleFunctionCall(response.function_call, file, conversation_id);
+        return await this.handleFunctionCall(response.function_call, file, conversation_id, user_id);
       }
       return {
         message: response.content,
@@ -402,8 +402,9 @@ Respond naturally and call functions when needed to help the user.`;
   /**
    * Handle function calls
    */
-  async handleFunctionCall(functionCall, file, conversation_id) {
-    const { name, arguments: args } = functionCall;
+  async handleFunctionCall(functionCall, file, conversation_id, user_id) {
+    const { name, arguments: argsString } = functionCall;
+    const args = typeof argsString === 'string' ? JSON.parse(argsString) : argsString;
     
     try {
       let result;
@@ -411,7 +412,7 @@ Respond naturally and call functions when needed to help the user.`;
 
       switch (name) {
         case 'create_database':
-          result = await this.executeCreateDatabase(args);
+          result = await this.executeCreateDatabase(args, user_id);
           message = `✅ Database "${args.name}" created successfully!`;
           break;
 
@@ -421,7 +422,7 @@ Respond naturally and call functions when needed to help the user.`;
           break;
 
         case 'get_schema':
-          result = await this.executeGetSchema(args);
+          result = await this.executeGetSchema(args, user_id);
           message = `📋 Here's the schema for database ${args.database_id}:`;
           break;
 
@@ -464,13 +465,14 @@ Respond naturally and call functions when needed to help the user.`;
   /**
    * Execute create_database
    */
-  async executeCreateDatabase(args) {
+  async executeCreateDatabase(args, user_id) {
     const databaseService = require('./databaseService');
     
     const dbData = {
       name: args.name,
       description: args.description || `Database created via chat: ${args.name}`,
-      type: 'mysql'
+      type: 'mysql',
+      user_id: user_id
     };
 
     const database = await databaseService.createDatabase(dbData);
@@ -518,13 +520,25 @@ Respond naturally and call functions when needed to help the user.`;
   /**
    * Execute get_schema
    */
-  async executeGetSchema(args) {
+  async executeGetSchema(args, user_id) {
     const databaseService = require('./databaseService');
-    const schema = await databaseService.getDatabaseSchema(args.database_id);
+    
+    // If database_id looks like a name (not a UUID), find the database by name
+    let databaseId = args.database_id;
+    if (!this.isUUID(args.database_id)) {
+      const databases = await databaseService.getAllDatabases(user_id);
+      const database = databases.find(db => db.name === args.database_id);
+      if (!database) {
+        throw new Error(`Database "${args.database_id}" not found`);
+      }
+      databaseId = database.id;
+    }
+    
+    const schema = await databaseService.getDatabaseSchema(databaseId, user_id);
     
     return {
       results: schema,
-      database_id: args.database_id
+      database_id: databaseId
     };
   }
 
@@ -593,6 +607,14 @@ Respond naturally and call functions when needed to help the user.`;
     if (upperSQL.startsWith('DROP')) return 'DROP';
     if (upperSQL.startsWith('ALTER')) return 'ALTER';
     return 'OTHER';
+  }
+
+  /**
+   * Check if a string is a valid UUID
+   */
+  isUUID(str) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(str);
   }
 }
 

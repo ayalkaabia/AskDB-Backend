@@ -43,8 +43,10 @@ const processChat = async (req, res) => {
     const chatRequest = {
       message: message || (file ? `Create a database from this file: ${file.originalname}` : ''),
       file: file,
-      conversation_id: chatId
+      conversation_id: chatId,
+      user_id: userId
     };
+    
 
     const aiResponse = await aiService.processChatRequest(chatRequest);
     

@@ -6,6 +6,10 @@ const path = require('path');
 require('dotenv').config();
 
 const askRouter = require('./backend/router/AskRouter');
+const chatRouter = require('./backend/router/ChatRouter');
+const userRouter = require('./backend/router/UserRouter');
+const conversationRouter = require('./backend/router/ConversationRouter');
+const historyRouter = require('./backend/router/HistoryRouter');
 const { testConnection, initializeDatabase } = require('./backend/utils/database');
 
 const app = express();
@@ -33,6 +37,10 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
 app.use('/api', askRouter);
+app.use('/api/chat', chatRouter);
+app.use('/api/users', userRouter);
+app.use('/api/conversations', conversationRouter);
+app.use('/api/history', historyRouter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
