@@ -55,14 +55,11 @@ class DatabaseRepository {
         params.push(status);
       }
       
-      // Use string interpolation for LIMIT and OFFSET to avoid parameter binding issues
-      const limitInt = parseInt(limit);
-      const offsetInt = parseInt(offset);
+      // Parse and validate integers (protects against SQL injection)
+      const limitInt = parseInt(limit, 10) || 50;
+      const offsetInt = parseInt(offset, 10) || 0;
       query += ` ORDER BY uploaded_at DESC LIMIT ${limitInt} OFFSET ${offsetInt}`;
       
-      console.log('getAllDatabases - Query:', query);
-      console.log('getAllDatabases - Params:', params);
-      console.log('getAllDatabases - Param types:', params.map(p => typeof p));
       
       const [rows] = await connection.execute(query, params);
       
@@ -114,19 +111,6 @@ class DatabaseRepository {
     }
   }
 
-  async getDatabaseById(id) {
-    const connection = await pool.getConnection();
-    try {
-      const [rows] = await connection.execute(
-        'SELECT * FROM `databases` WHERE id = ?',
-        [id]
-      );
-      
-      return rows.length > 0 ? rows[0] : null;
-    } finally {
-      connection.release();
-    }
-  }
 
   async deleteDatabase(id) {
     const connection = await pool.getConnection();
@@ -237,9 +221,13 @@ class DatabaseRepository {
   async getUserDatabases(userId, limit = 50, offset = 0) {
     const connection = await pool.getConnection();
     try {
+      // Parse and validate integers (protects against SQL injection)
+      const limitInt = parseInt(limit, 10) || 50;
+      const offsetInt = parseInt(offset, 10) || 0;
+      
       const [rows] = await connection.execute(
-        'SELECT * FROM `databases` WHERE user_id = ? ORDER BY uploaded_at DESC LIMIT ? OFFSET ?',
-        [userId, limit, offset]
+        `SELECT * FROM \`databases\` WHERE user_id = ? ORDER BY uploaded_at DESC LIMIT ${limitInt} OFFSET ${offsetInt}`,
+        [userId]
       );
       
       return rows;

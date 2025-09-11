@@ -36,8 +36,8 @@ const getUserDatabases = async (userId, limit = 50, offset = 0) => {
   return await databaseRepo.getUserDatabases(userId, limit, offset);
 };
 
-const getDatabaseById = async (id) => {
-  return await databaseRepo.getDatabaseById(id);
+const getDatabaseById = async (id, userId) => {
+  return await databaseRepo.getDatabaseById(id, userId);
 };
 
 
@@ -112,9 +112,9 @@ const getDatabaseSchema = async (id, userId) => {
   }
 };
 
-const deleteDatabase = async (id) => {
+const deleteDatabase = async (id, userId) => {
   try {
-    const database = await databaseRepo.getDatabaseById(id);
+    const database = await databaseRepo.getDatabaseById(id, userId);
     if (!database) {
       return false;
     }
@@ -141,7 +141,7 @@ const deleteDatabase = async (id) => {
 };
 
 const createBackup = async (backupData) => {
-  const database = await databaseRepo.getDatabaseById(backupData.database_id);
+  const database = await databaseRepo.getDatabaseById(backupData.database_id, backupData.user_id);
   if (!database) {
     throw new Error('Database not found');
   }
@@ -178,9 +178,11 @@ const getDatabaseStats = async () => {
 /**
  * Execute SQL query on a specific database
  */
-const executeQuery = async (databaseId, sqlQuery, params = []) => {
+const executeQuery = async (databaseId, sqlQuery, params = [], userId = null) => {
   try {
-    const database = await databaseRepo.getDatabaseById(databaseId);
+    const database = userId ? 
+      await databaseRepo.getDatabaseById(databaseId, userId) : 
+      await databaseRepo.getDatabaseById(databaseId);
     if (!database) {
       throw new Error('Database not found');
     }
@@ -199,9 +201,9 @@ const executeQuery = async (databaseId, sqlQuery, params = []) => {
 /**
  * Import SQL file into a database
  */
-const importSQLFile = async (databaseId, sqlContent) => {
+const importSQLFile = async (databaseId, sqlContent, userId) => {
   try {
-    const database = await databaseRepo.getDatabaseById(databaseId);
+    const database = await databaseRepo.getDatabaseById(databaseId, userId);
     if (!database) {
       throw new Error('Database not found');
     }
@@ -220,9 +222,9 @@ const importSQLFile = async (databaseId, sqlContent) => {
 /**
  * Get database statistics
  */
-const getDatabaseStatistics = async (databaseId) => {
+const getDatabaseStatistics = async (databaseId, userId) => {
   try {
-    const database = await databaseRepo.getDatabaseById(databaseId);
+    const database = await databaseRepo.getDatabaseById(databaseId, userId);
     if (!database) {
       throw new Error('Database not found');
     }
@@ -246,9 +248,9 @@ const getDatabaseStatistics = async (databaseId) => {
 /**
  * Test database connection
  */
-const testDatabaseConnection = async (databaseId) => {
+const testDatabaseConnection = async (databaseId, userId) => {
   try {
-    const database = await databaseRepo.getDatabaseById(databaseId);
+    const database = await databaseRepo.getDatabaseById(databaseId, userId);
     if (!database) {
       throw new Error('Database not found');
     }

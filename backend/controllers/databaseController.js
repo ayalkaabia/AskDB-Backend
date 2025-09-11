@@ -136,6 +136,7 @@ const createDatabase = async (req, res) => {
 const getDatabaseById = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user.id; // From auth middleware
     
     if (!id) {
       return res.status(400).json({
@@ -144,7 +145,7 @@ const getDatabaseById = async (req, res) => {
       });
     }
 
-    const database = await databaseService.getDatabaseById(id);
+    const database = await databaseService.getDatabaseById(id, userId);
     
     if (!database) {
       return res.status(404).json({
@@ -167,6 +168,7 @@ const getDatabaseById = async (req, res) => {
 const getDatabaseSchema = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user.id; // From auth middleware
     
     if (!id) {
       return res.status(400).json({
@@ -175,7 +177,7 @@ const getDatabaseSchema = async (req, res) => {
       });
     }
 
-    const schema = await databaseService.getDatabaseSchema(id);
+    const schema = await databaseService.getDatabaseSchema(id, userId);
     
     if (!schema) {
       return res.status(404).json({
@@ -198,6 +200,7 @@ const getDatabaseSchema = async (req, res) => {
 const deleteDatabase = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user.id; // From auth middleware
     
     if (!id) {
       return res.status(400).json({
@@ -207,7 +210,7 @@ const deleteDatabase = async (req, res) => {
     }
 
     // Check if database exists
-    const existingDatabase = await databaseService.getDatabaseById(id);
+    const existingDatabase = await databaseService.getDatabaseById(id, userId);
     if (!existingDatabase) {
       return res.status(404).json({
         error: 'Not Found',
@@ -215,7 +218,7 @@ const deleteDatabase = async (req, res) => {
       });
     }
 
-    const deleted = await databaseService.deleteDatabase(id);
+    const deleted = await databaseService.deleteDatabase(id, userId);
     
     if (!deleted) {
       return res.status(404).json({
@@ -242,6 +245,7 @@ const createBackup = async (req, res) => {
   try {
     const { id } = req.params;
     const { backup_name, description } = req.body;
+    const userId = req.user.id; // From auth middleware
     
     if (!id) {
       return res.status(400).json({
@@ -251,7 +255,7 @@ const createBackup = async (req, res) => {
     }
 
     // Check if database exists
-    const existingDatabase = await databaseService.getDatabaseById(id);
+    const existingDatabase = await databaseService.getDatabaseById(id, userId);
     if (!existingDatabase) {
       return res.status(404).json({
         error: 'Not Found',
@@ -303,6 +307,7 @@ const executeQuery = async (req, res) => {
   try {
     const { id } = req.params;
     const { sql_query, params = [] } = req.body;
+    const userId = req.user.id; // From auth middleware
     
     if (!id) {
       return res.status(400).json({
@@ -318,7 +323,7 @@ const executeQuery = async (req, res) => {
       });
     }
 
-    const result = await databaseService.executeQuery(id, sql_query, params);
+    const result = await databaseService.executeQuery(id, sql_query, params, userId);
     
     res.status(200).json({
       message: 'Query executed successfully',
@@ -341,6 +346,7 @@ const importSQLFile = async (req, res) => {
   try {
     const { id } = req.params;
     const { sql_content } = req.body;
+    const userId = req.user.id; // From auth middleware
     
     if (!id) {
       return res.status(400).json({
@@ -356,7 +362,7 @@ const importSQLFile = async (req, res) => {
       });
     }
 
-    const result = await databaseService.importSQLFile(id, sql_content);
+    const result = await databaseService.importSQLFile(id, sql_content, userId);
     
     res.status(200).json({
       message: 'SQL file imported successfully',
@@ -378,6 +384,7 @@ const importSQLFile = async (req, res) => {
 const getDatabaseStatistics = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user.id; // From auth middleware
     
     if (!id) {
       return res.status(400).json({
@@ -386,7 +393,7 @@ const getDatabaseStatistics = async (req, res) => {
       });
     }
 
-    const stats = await databaseService.getDatabaseStatistics(id);
+    const stats = await databaseService.getDatabaseStatistics(id, userId);
     
     res.status(200).json(stats);
 
@@ -405,6 +412,7 @@ const getDatabaseStatistics = async (req, res) => {
 const testDatabaseConnection = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user.id; // From auth middleware
     
     if (!id) {
       return res.status(400).json({
@@ -413,7 +421,7 @@ const testDatabaseConnection = async (req, res) => {
       });
     }
 
-    const isConnected = await databaseService.testDatabaseConnection(id);
+    const isConnected = await databaseService.testDatabaseConnection(id, userId);
     
     res.status(200).json({
       message: isConnected ? 'Database connection successful' : 'Database connection failed',

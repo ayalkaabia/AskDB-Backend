@@ -5,6 +5,10 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 require('dotenv').config();
 
+// Import logging and error handling
+const { addRequestId, requestLogger } = require('./backend/utils/logger');
+const { errorHandler } = require('./backend/middleware/errorHandler');
+
 const askRouter = require('./backend/router/AskRouter');
 const chatRouter = require('./backend/router/ChatRouter');
 const userRouter = require('./backend/router/UserRouter');
@@ -15,13 +19,24 @@ const { testConnection, initializeDatabase } = require('./backend/utils/database
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Request ID and logging middleware
+app.use(addRequestId);
+app.use(requestLogger);
+
 // Security middleware
 app.use(helmet());
 
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: {
+    error: 'Too Many Requests',
+    message: 'Too many requests from this IP, please try again later.',
+    retryAfter: '15 minutes'
+  },
+  standardHeaders: true,
+  legacyHeaders: false
 });
 app.use(limiter);
 
@@ -36,11 +51,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
-app.use('/api', askRouter);
-app.use('/api/chat', chatRouter);
-app.use('/api/users', userRouter);
-app.use('/api/conversations', conversationRouter);
-app.use('/api/history', historyRouter);
+app.use('/', askRouter);
+app.use('/chat', chatRouter);
+app.use('/users', userRouter);
+app.use('/conversations', conversationRouter);
+app.use('/history', historyRouter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -53,13 +68,7 @@ app.use('*', (req, res) => {
 });
 
 // Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ 
-    error: 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
-  });
-});
+app.use(errorHandler);
 
 // Initialize database and start server
 const startServer = async () => {

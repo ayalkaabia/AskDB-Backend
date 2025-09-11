@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 class DatabaseConnectionManager {
   constructor() {
     this.connections = new Map(); // Store active connections
+    this.connectionTimeouts = new Map(); // Track connection timeouts
     this.baseConfig = {
       host: process.env.DB_HOST || 'localhost',
       user: process.env.DB_USER || 'root',
@@ -11,7 +12,11 @@ class DatabaseConnectionManager {
       port: Number(process.env.DB_PORT) || 3306,
       waitForConnections: true,
       connectionLimit: 5,
-      queueLimit: 0
+      queueLimit: 0,
+      acquireTimeout: 60000, // 60 seconds
+      timeout: 60000, // 60 seconds
+      reconnect: true,
+      idleTimeout: 300000 // 5 minutes
     };
   }
 
@@ -62,7 +67,18 @@ class DatabaseConnectionManager {
     try {
       // Check if we already have a connection for this database
       if (this.connections.has(databaseName)) {
-        return this.connections.get(databaseName);
+        const connection = this.connections.get(databaseName);
+        
+        // Check if connection is still alive
+        try {
+          await connection.execute('SELECT 1');
+          return connection;
+        } catch (error) {
+          // Connection is dead, remove it and create a new one
+          console.warn(`Connection to ${databaseName} is dead, creating new one`);
+          this.connections.delete(databaseName);
+          this.connectionTimeouts.delete(databaseName);
+        }
       }
 
       // Create new connection
@@ -74,6 +90,9 @@ class DatabaseConnectionManager {
 
       // Store connection
       this.connections.set(databaseName, connection);
+      
+      // Set up connection timeout cleanup
+      this.setupConnectionTimeout(databaseName, connection);
 
       return connection;
 
@@ -81,6 +100,30 @@ class DatabaseConnectionManager {
       console.error(`Error connecting to database ${databaseName}:`, error);
       throw new Error(`Failed to connect to database: ${error.message}`);
     }
+  }
+
+  /**
+   * Set up connection timeout cleanup
+   */
+  setupConnectionTimeout(databaseName, connection) {
+    // Clear existing timeout if any
+    if (this.connectionTimeouts.has(databaseName)) {
+      clearTimeout(this.connectionTimeouts.get(databaseName));
+    }
+
+    // Set new timeout to close idle connection
+    const timeout = setTimeout(async () => {
+      try {
+        await connection.end();
+        this.connections.delete(databaseName);
+        this.connectionTimeouts.delete(databaseName);
+        console.log(`Closed idle connection to ${databaseName}`);
+      } catch (error) {
+        console.error(`Error closing idle connection to ${databaseName}:`, error);
+      }
+    }, this.baseConfig.idleTimeout);
+
+    this.connectionTimeouts.set(databaseName, timeout);
   }
 
   /**
@@ -298,8 +341,19 @@ class DatabaseConnectionManager {
    */
   async closeAllConnections() {
     try {
+      // Clear all timeouts
+      for (const [databaseName, timeout] of this.connectionTimeouts) {
+        clearTimeout(timeout);
+      }
+      this.connectionTimeouts.clear();
+
+      // Close all connections
       for (const [databaseName, connection] of this.connections) {
-        await connection.end();
+        try {
+          await connection.end();
+        } catch (error) {
+          console.error(`Error closing connection to ${databaseName}:`, error);
+        }
       }
       this.connections.clear();
     } catch (error) {
@@ -312,6 +366,13 @@ class DatabaseConnectionManager {
    */
   async closeConnection(databaseName) {
     try {
+      // Clear timeout
+      if (this.connectionTimeouts.has(databaseName)) {
+        clearTimeout(this.connectionTimeouts.get(databaseName));
+        this.connectionTimeouts.delete(databaseName);
+      }
+
+      // Close connection
       if (this.connections.has(databaseName)) {
         const connection = this.connections.get(databaseName);
         await connection.end();

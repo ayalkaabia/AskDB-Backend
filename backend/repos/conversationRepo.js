@@ -41,14 +41,14 @@ class ConversationRepository {
   async getUserConversations(userId, limit = 50, offset = 0) {
     const connection = await pool.getConnection();
     try {
-      limit = parseInt(limit, 10) || 50;
-      offset = parseInt(offset, 10) || 0;
+      const limitInt = parseInt(limit, 10) || 50;
+      const offsetInt = parseInt(offset, 10) || 0;
 
       const [rows] = await connection.execute(
         `SELECT * FROM conversations 
          WHERE user_id = ? 
          ORDER BY last_message_at DESC 
-         LIMIT ${limit} OFFSET ${offset}`,
+         LIMIT ${limitInt} OFFSET ${offsetInt}`,
         [userId]
       );
       

@@ -23,11 +23,11 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// POST /auth/register - Register new user
-router.post('/auth/register', authLimiter, validateBody(registerSchema), userController.register);
+// POST /register - Register new user
+router.post('/register', authLimiter, validateBody(registerSchema), userController.register);
 
-// POST /auth/login - Login user
-router.post('/auth/login', authLimiter, validateBody(loginSchema), userController.login);
+// POST /login - Login user
+router.post('/login', authLimiter, validateBody(loginSchema), userController.login);
 
 // GET /users/me - Get current user profile
 router.get('/me', auth, userController.me);

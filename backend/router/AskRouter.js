@@ -25,23 +25,39 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    // Sanitize filename to prevent path traversal
+    const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const extension = path.extname(sanitizedName);
+    cb(null, file.fieldname + '-' + uniqueSuffix + extension);
   }
 });
 
 const upload = multer({ 
   storage: storage,
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/octet-stream' || 
-        file.originalname.endsWith('.sql') || 
-        file.originalname.endsWith('.db')) {
+    // Enhanced file validation
+    const allowedExtensions = ['.sql', '.db'];
+    const allowedMimeTypes = ['application/octet-stream', 'application/sql', 'application/x-sqlite3'];
+    
+    const fileExtension = path.extname(file.originalname).toLowerCase();
+    const isValidExtension = allowedExtensions.includes(fileExtension);
+    const isValidMimeType = allowedMimeTypes.includes(file.mimetype) || 
+                           file.mimetype === 'application/octet-stream';
+    
+    // Check for path traversal attempts
+    if (file.originalname.includes('..') || file.originalname.includes('/') || file.originalname.includes('\\')) {
+      return cb(new Error('Invalid filename: path traversal not allowed'), false);
+    }
+    
+    if (isValidExtension && isValidMimeType) {
       cb(null, true);
     } else {
       cb(new Error('Only .sql and .db files are allowed'), false);
     }
   },
   limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB limit
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+    files: 1 // Only allow one file at a time
   }
 });
 
@@ -126,28 +142,28 @@ router.get('/databases/:id', auth, databaseController.getDatabaseById);
 router.delete('/databases/:id', auth, databaseController.deleteDatabase);
 
 // GET /databases/:id/schema - Get database schema
-router.get('/databases/:id/schema', databaseController.getDatabaseSchema);
+router.get('/databases/:id/schema', auth, databaseController.getDatabaseSchema);
 
 // GET /databases/stats - Get database statistics
-router.get('/databases/stats', databaseController.getDatabaseStats);
+router.get('/databases/stats', auth, databaseController.getDatabaseStats);
 
 // GET /databases/:id/stats - Get specific database statistics
-router.get('/databases/:id/stats', databaseController.getDatabaseStatistics);
+router.get('/databases/:id/stats', auth, databaseController.getDatabaseStatistics);
 
 // POST /databases/:id/execute - Execute SQL query on specific database
-router.post('/databases/:id/execute', databaseController.executeQuery);
+router.post('/databases/:id/execute', auth, databaseController.executeQuery);
 
 // POST /databases/:id/import - Import SQL file into specific database
-router.post('/databases/:id/import', databaseController.importSQLFile);
+router.post('/databases/:id/import', auth, databaseController.importSQLFile);
 
 // GET /databases/:id/test - Test database connection
-router.get('/databases/:id/test', databaseController.testDatabaseConnection);
+router.get('/databases/:id/test', auth, databaseController.testDatabaseConnection);
 
 // GET /databases/server/list - List all databases on MySQL server
-router.get('/databases/server/list', databaseController.listServerDatabases);
+router.get('/databases/server/list', auth, databaseController.listServerDatabases);
 
 // POST /databases/:id/backup - Create backup of specific database
-router.post('/databases/:id/backup', databaseController.createBackup);
+router.post('/databases/:id/backup', auth, databaseController.createBackup);
 
 
 

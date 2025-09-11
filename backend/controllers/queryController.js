@@ -19,7 +19,7 @@ const processQuery = async (req, res) => {
     let results;
     if (database_id) {
       // Execute on specific database
-      results = await databaseService.executeQuery(database_id, sqlQuery);
+      results = await databaseService.executeQuery(database_id, sqlQuery, [], req.user?.id);
     } else {
       // Execute on default database
       results = await queryService.executeQuery(sqlQuery);
@@ -69,7 +69,7 @@ const runSQL = async (req, res) => {
     let results;
     if (database_id) {
       // Execute on specific database
-      results = await databaseService.executeQuery(database_id, sql, params);
+      results = await databaseService.executeQuery(database_id, sql, params, req.user?.id);
     } else {
       // Execute on default database
       results = await queryService.executeQuery(sql);
@@ -232,7 +232,7 @@ const executeMultipleQueries = async (req, res) => {
     let results;
     if (database_id) {
       // Execute on specific database
-      const database = await databaseService.getDatabaseById(database_id);
+      const database = await databaseService.getDatabaseById(database_id, req.user?.id);
       if (!database) {
         return res.status(404).json({
           error: 'Not Found',

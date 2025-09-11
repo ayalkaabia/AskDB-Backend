@@ -61,12 +61,12 @@ class HistoryRepository {
   async getHistory(limit = 50, offset = 0) {
     const connection = await pool.getConnection();
     try {
-      // Ensure integers (protects against SQL injection)
-      limit = parseInt(limit, 10) || 50;
-      offset = parseInt(offset, 10) || 0;
+      // Parse and validate integers (protects against SQL injection)
+      const limitInt = parseInt(limit, 10) || 50;
+      const offsetInt = parseInt(offset, 10) || 0;
   
       const [rows] = await connection.query(
-        `SELECT * FROM \`query_history\` ORDER BY timestamp DESC LIMIT ${limit} OFFSET ${offset}`
+        `SELECT * FROM \`query_history\` ORDER BY timestamp DESC LIMIT ${limitInt} OFFSET ${offsetInt}`
       );
       
       return rows.map(row => ({
@@ -94,7 +94,7 @@ class HistoryRepository {
         const row = rows[0];
         return {
           ...row,
-          results: row.results ? JSON.parse(row.results) : null
+          results: row.results ? (typeof row.results === 'string' ? JSON.parse(row.results) : row.results) : null
         };
       }
       return null;
@@ -108,14 +108,18 @@ class HistoryRepository {
     const connection = await pool.getConnection();
     try {
       const searchTerm = `%${query}%`;
+      // Parse and validate integers (protects against SQL injection)
+      const limitInt = parseInt(limit, 10) || 50;
+      const offsetInt = parseInt(offset, 10) || 0;
+      
       const [rows] = await connection.execute(
-        'SELECT * FROM `query_history` WHERE prompt LIKE ? OR sql_query LIKE ? ORDER BY timestamp DESC LIMIT ? OFFSET ?',
-        [searchTerm, searchTerm, limit, offset]
+        `SELECT * FROM \`query_history\` WHERE prompt LIKE ? OR sql_query LIKE ? ORDER BY timestamp DESC LIMIT ${limitInt} OFFSET ${offsetInt}`,
+        [searchTerm, searchTerm]
       );
       
       return rows.map(row => ({
         ...row,
-        results: row.results ? JSON.parse(row.results) : null
+        results: row.results ? (typeof row.results === 'string' ? JSON.parse(row.results) : row.results) : null
       }));
     } finally {
       connection.release();
@@ -218,16 +222,20 @@ class HistoryRepository {
     const connection = await pool.getConnection();
     
     try {
+      // Parse and validate integers (protects against SQL injection)
+      const limitInt = parseInt(limit, 10) || 50;
+      const offsetInt = parseInt(offset, 10) || 0;
+      
       const [rows] = await connection.execute(`
         SELECT * FROM \`query_history\` 
         WHERE conversation_id = ? 
         ORDER BY timestamp DESC 
-        LIMIT ? OFFSET ?
-      `, [conversationId, limit, offset]);
+        LIMIT ${limitInt} OFFSET ${offsetInt}
+      `, [conversationId]);
       
       return rows.map(row => ({
         ...row,
-        results: row.results ? JSON.parse(row.results) : null
+        results: row.results ? (typeof row.results === 'string' ? JSON.parse(row.results) : row.results) : null
       }));
     } finally {
       connection.release();

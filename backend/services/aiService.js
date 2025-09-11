@@ -218,9 +218,9 @@ Generate the appropriate MySQL query to fulfill this request. Return only the SQ
    */
   async processChatRequest(chatRequest) {
     try {
-      const { message, file, conversation_id, user_id } = chatRequest;
+      const { message, file, conversation_id, user_id, conversation_history } = chatRequest;
       
-      const systemPrompt = this.buildChatSystemPrompt();
+      const systemPrompt = this.buildChatSystemPrompt(conversation_history);
       
       let userMessage = message;
       if (file) {
@@ -247,8 +247,17 @@ Generate the appropriate MySQL query to fulfill this request. Return only the SQ
       }
 
       if (response.function_call) {
-        return await this.handleFunctionCall(response.function_call, file, conversation_id, user_id);
+        return await this.handleFunctionCall(response.function_call, file, conversation_id, user_id, conversation_history);
       }
+      
+      // If AI responds with text but user is asking about previous context, be more proactive
+      if (this.shouldCallListDatabases(userMessage, conversation_history)) {
+        return await this.handleFunctionCall({
+          name: 'list_databases',
+          arguments: '{}'
+        }, file, conversation_id, user_id, conversation_history);
+      }
+      
       return {
         message: response.content,
         action_type: 'chat',
@@ -265,9 +274,39 @@ Generate the appropriate MySQL query to fulfill this request. Return only the SQ
   }
 
   /**
-   * Build system prompt for chat
+   * Build system prompt for chat with conversation context
    */
-  buildChatSystemPrompt() {
+  buildChatSystemPrompt(conversation_history = []) {
+    let contextInfo = '';
+    
+    if (conversation_history && conversation_history.length > 0) {
+      contextInfo = '\n\nCONVERSATION CONTEXT:\n';
+      contextInfo += 'Recent conversation history:\n';
+      
+      // Get last 5 messages for context
+      const recentHistory = conversation_history.slice(-5);
+      recentHistory.forEach((entry, index) => {
+        contextInfo += `${index + 1}. User: "${entry.prompt}"\n`;
+        if (entry.sql) {
+          contextInfo += `   SQL: ${entry.sql}\n`;
+        }
+        if (entry.database_id) {
+          contextInfo += `   Database ID: ${entry.database_id}\n`;
+        }
+        contextInfo += '\n';
+      });
+      
+      // Extract database information from history
+      const databasesInConversation = this.extractDatabasesFromHistory(conversation_history);
+      if (databasesInConversation.length > 0) {
+        contextInfo += 'DATABASES CREATED/REFERENCED IN THIS CONVERSATION:\n';
+        databasesInConversation.forEach(db => {
+          contextInfo += `- ${db.name} (ID: ${db.database_id})\n`;
+        });
+        contextInfo += '\n';
+      }
+    }
+
     return `You are AskDB, an AI assistant that helps users manage MySQL databases through natural language.
 
 You can help users with:
@@ -290,6 +329,18 @@ Guidelines:
 - For queries, always show the SQL and results
 - If a user uploads a file, offer to create a database from it
 - Be proactive in suggesting next steps
+- Use conversation context to make smart decisions about which database to work with
+- If the user refers to a database without specifying which one, use the most recently created/referenced database from the conversation
+- If multiple databases exist in the conversation, ask for clarification
+
+FUNCTION USAGE RULES:
+- Use 'create_database' ONLY when user explicitly wants to create a NEW database
+- Use 'execute_query' for ALL other database operations: creating tables, inserting data, selecting data, updating data, etc.
+- When user says "create table" or "add table", use 'execute_query' with CREATE TABLE SQL
+- When user says "add [data]" or "insert [data]", use 'execute_query' with INSERT SQL
+- When user refers to an existing database (like "customers database"), use 'execute_query' with that database
+
+${contextInfo}
 
 Respond naturally and call functions when needed to help the user.`;
   }
@@ -301,7 +352,7 @@ Respond naturally and call functions when needed to help the user.`;
     return [
       {
         name: 'create_database',
-        description: 'Create a new MySQL database with tables',
+        description: 'Create a completely new MySQL database. Only use this when the user explicitly wants to create a NEW database. Do NOT use this for creating tables in existing databases.',
         parameters: {
           type: 'object',
           properties: {
@@ -340,17 +391,17 @@ Respond naturally and call functions when needed to help the user.`;
       },
       {
         name: 'execute_query',
-        description: 'Execute a SQL query on a database',
+        description: 'Execute SQL queries on a database. Use this for creating tables, inserting data, selecting data, updating data, or any other SQL operations. This is the primary function for database operations.',
         parameters: {
           type: 'object',
           properties: {
             sql: {
               type: 'string',
-              description: 'SQL query to execute'
+              description: 'SQL query to execute (CREATE TABLE, INSERT, SELECT, UPDATE, DELETE, etc.)'
             },
             database_id: {
               type: 'string',
-              description: 'ID of the database to query'
+              description: 'ID of the database to query (optional - will use conversation context if not provided)'
             }
           },
           required: ['sql']
@@ -402,9 +453,22 @@ Respond naturally and call functions when needed to help the user.`;
   /**
    * Handle function calls
    */
-  async handleFunctionCall(functionCall, file, conversation_id, user_id) {
+  async handleFunctionCall(functionCall, file, conversation_id, user_id, conversation_history) {
     const { name, arguments: argsString } = functionCall;
-    const args = typeof argsString === 'string' ? JSON.parse(argsString) : argsString;
+    
+    let args;
+    if (typeof argsString === 'string') {
+      try {
+        args = JSON.parse(argsString);
+      } catch (error) {
+        console.error('JSON parse error:', error.message, 'String:', argsString);
+        throw new Error(`Invalid JSON in function arguments: ${error.message}`);
+      }
+    } else if (typeof argsString === 'object' && argsString !== null) {
+      args = argsString;
+    } else {
+      args = {};
+    }
     
     try {
       let result;
@@ -412,22 +476,22 @@ Respond naturally and call functions when needed to help the user.`;
 
       switch (name) {
         case 'create_database':
-          result = await this.executeCreateDatabase(args, user_id);
+          result = await this.executeCreateDatabase(args, user_id, conversation_history);
           message = `✅ Database "${args.name}" created successfully!`;
           break;
 
         case 'execute_query':
-          result = await this.executeQuery(args);
+          result = await this.executeQuery(args, user_id, conversation_history);
           message = `📊 Query executed successfully. Found ${result.results?.length || 0} results.`;
           break;
 
         case 'get_schema':
-          result = await this.executeGetSchema(args, user_id);
+          result = await this.executeGetSchema(args, user_id, conversation_history);
           message = `📋 Here's the schema for database ${args.database_id}:`;
           break;
 
         case 'list_databases':
-          result = await this.executeListDatabases();
+          result = await this.executeListDatabases(user_id);
           message = `📁 Here are all available databases:`;
           break;
 
@@ -465,8 +529,28 @@ Respond naturally and call functions when needed to help the user.`;
   /**
    * Execute create_database
    */
-  async executeCreateDatabase(args, user_id) {
+  async executeCreateDatabase(args, user_id, conversation_history) {
     const databaseService = require('./databaseService');
+    
+    // Check if database with same name already exists in conversation
+    const existingDatabases = this.extractDatabasesFromHistory(conversation_history);
+    const existingDb = existingDatabases.find(db => 
+      db.name.toLowerCase() === args.name.toLowerCase()
+    );
+    
+    if (existingDb) {
+      throw new Error(`Database "${args.name}" already exists in this conversation. Use database ID: ${existingDb.database_id}`);
+    }
+    
+    // Also check if database exists in user's databases
+    const userDatabases = await databaseService.getAllDatabases(user_id);
+    const existingUserDb = userDatabases.find(db => 
+      db.name.toLowerCase() === args.name.toLowerCase()
+    );
+    
+    if (existingUserDb) {
+      throw new Error(`Database "${args.name}" already exists. Use database ID: ${existingUserDb.id}`);
+    }
     
     const dbData = {
       name: args.name,
@@ -496,42 +580,109 @@ Respond naturally and call functions when needed to help the user.`;
   /**
    * Execute query
    */
-  async executeQuery(args) {
+  async executeQuery(args, user_id, conversation_history) {
     const databaseService = require('./databaseService');
     
-    if (args.database_id) {
-      const results = await databaseService.executeQuery(args.database_id, args.sql);
-      return {
-        sql: args.sql,
-        results: results,
-        database_id: args.database_id
-      };
-    } else {
-      const queryService = require('./queryService');
-      const results = await queryService.executeQuery(args.sql);
-      return {
-        sql: args.sql,
-        results: results,
-        database_id: null
-      };
+    let databaseId = args.database_id;
+    
+    // If no database_id specified, try to resolve from conversation context
+    if (!databaseId) {
+      const databasesInConversation = this.extractDatabasesFromHistory(conversation_history);
+      
+      if (databasesInConversation.length === 1) {
+        // Use the only database in conversation
+        databaseId = databasesInConversation[0].database_id;
+      } else if (databasesInConversation.length > 1) {
+        // Multiple databases - ask for clarification
+        const dbNames = databasesInConversation.map(db => db.name).join(', ');
+        throw new Error(`Multiple databases found in this conversation: ${dbNames}. Please specify which database to use.`);
+      } else {
+        // No databases in conversation - use default behavior
+        const queryService = require('./queryService');
+        const results = await queryService.executeQuery(args.sql);
+        return {
+          sql: args.sql,
+          results: results,
+          database_id: null
+        };
+      }
     }
+    
+    // Resolve database name to ID if needed
+    if (!this.isUUID(databaseId)) {
+      const databasesInConversation = this.extractDatabasesFromHistory(conversation_history);
+      const foundDb = databasesInConversation.find(db => 
+        db.name.toLowerCase() === databaseId.toLowerCase()
+      );
+      
+      if (foundDb) {
+        databaseId = foundDb.database_id;
+      } else {
+        // Try to find in all user databases
+        const allDatabases = await databaseService.getAllDatabases(user_id);
+        const foundDb = allDatabases.find(db => 
+          db.name.toLowerCase() === databaseId.toLowerCase()
+        );
+        
+        if (foundDb) {
+          databaseId = foundDb.id;
+        } else {
+          throw new Error(`Database "${databaseId}" not found. Available databases: ${allDatabases.map(db => db.name).join(', ')}`);
+        }
+      }
+    }
+    
+    const results = await databaseService.executeQuery(databaseId, args.sql, [], user_id);
+    return {
+      sql: args.sql,
+      results: results,
+      database_id: databaseId
+    };
   }
 
   /**
    * Execute get_schema
    */
-  async executeGetSchema(args, user_id) {
+  async executeGetSchema(args, user_id, conversation_history) {
     const databaseService = require('./databaseService');
     
-    // If database_id looks like a name (not a UUID), find the database by name
     let databaseId = args.database_id;
-    if (!this.isUUID(args.database_id)) {
-      const databases = await databaseService.getAllDatabases(user_id);
-      const database = databases.find(db => db.name === args.database_id);
-      if (!database) {
-        throw new Error(`Database "${args.database_id}" not found`);
+    
+    // If no database_id specified, try to resolve from conversation context
+    if (!databaseId) {
+      const databasesInConversation = this.extractDatabasesFromHistory(conversation_history);
+      
+      if (databasesInConversation.length === 1) {
+        // Use the only database in conversation
+        databaseId = databasesInConversation[0].database_id;
+      } else if (databasesInConversation.length > 1) {
+        // Multiple databases - ask for clarification
+        const dbNames = databasesInConversation.map(db => db.name).join(', ');
+        throw new Error(`Multiple databases found in this conversation: ${dbNames}. Please specify which database to get the schema for.`);
+      } else {
+        throw new Error('No database specified and no databases found in this conversation. Please specify which database to get the schema for.');
       }
-      databaseId = database.id;
+    }
+    
+    // If database_id looks like a name (not a UUID), find the database by name
+    if (!this.isUUID(databaseId)) {
+      // First check conversation context
+      const databasesInConversation = this.extractDatabasesFromHistory(conversation_history);
+      const foundDb = databasesInConversation.find(db => 
+        db.name.toLowerCase() === databaseId.toLowerCase()
+      );
+      
+      if (foundDb) {
+        databaseId = foundDb.database_id;
+      } else {
+        // Try to find in all user databases
+        const databases = await databaseService.getAllDatabases(user_id);
+        const database = databases.find(db => db.name === databaseId);
+        if (!database) {
+          throw new Error(`Database "${databaseId}" not found`);
+        }
+        databaseId = database.id;
+      }
     }
     
     const schema = await databaseService.getDatabaseSchema(databaseId, user_id);
@@ -545,12 +696,13 @@ Respond naturally and call functions when needed to help the user.`;
   /**
    * Execute list_databases
    */
-  async executeListDatabases() {
+  async executeListDatabases(user_id) {
     const databaseService = require('./databaseService');
-    const databases = await databaseService.getAllDatabases();
+    const databases = await databaseService.getAllDatabases(user_id);
     
     return {
-      results: databases
+      results: databases,
+      database_id: databases.length === 1 ? databases[0].id : null
     };
   }
 
@@ -615,6 +767,67 @@ Respond naturally and call functions when needed to help the user.`;
   isUUID(str) {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     return uuidRegex.test(str);
+  }
+
+  /**
+   * Check if we should call list_databases when user asks about previous context
+   */
+  shouldCallListDatabases(userMessage, conversation_history) {
+    const message = userMessage.toLowerCase();
+    
+    // Only trigger for questions about previous context when no useful history exists
+    const askingAboutPrevious = (message.includes('previous') || 
+                                message.includes('before') || 
+                                message.includes('earlier') ||
+                                message.includes('see my') ||
+                                message.includes('specified')) &&
+                               (message.includes('database') || message.includes('table') || message.includes('message'));
+    
+    const hasUsefulHistory = conversation_history.some(entry => 
+      entry.sql_query && entry.sql_query.trim() !== '' && entry.database_id
+    );
+    
+    return askingAboutPrevious && !hasUsefulHistory;
+  }
+
+  /**
+   * Extract database information from conversation history
+   */
+  extractDatabasesFromHistory(conversation_history) {
+    const databases = new Map();
+    
+    conversation_history.forEach(entry => {
+      if (entry.database_id && entry.sql) {
+        // Extract database name from SQL or prompt
+        let dbName = 'Unknown Database';
+        
+        // Try to extract from SQL
+        if (entry.sql.includes('CREATE DATABASE')) {
+          const match = entry.sql.match(/CREATE DATABASE\s+([^\s;]+)/i);
+          if (match) {
+            dbName = match[1].replace(/`/g, '');
+          }
+        }
+        
+        // Try to extract from prompt
+        if (entry.prompt && entry.prompt.toLowerCase().includes('database')) {
+          const match = entry.prompt.match(/database\s+(?:called\s+)?([^\s,]+)/i);
+          if (match) {
+            dbName = match[1];
+          }
+        }
+        
+        databases.set(entry.database_id, {
+          database_id: entry.database_id,
+          name: dbName,
+          last_referenced: entry.created_at
+        });
+      }
+    });
+    
+    return Array.from(databases.values()).sort((a, b) => 
+      new Date(b.last_referenced) - new Date(a.last_referenced)
+    );
   }
 }
 

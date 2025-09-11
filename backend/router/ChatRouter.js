@@ -23,23 +23,39 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    // Sanitize filename to prevent path traversal
+    const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const extension = path.extname(sanitizedName);
+    cb(null, file.fieldname + '-' + uniqueSuffix + extension);
   }
 });
 
 const upload = multer({ 
   storage: storage,
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/octet-stream' || 
-        file.originalname.endsWith('.sql') || 
-        file.originalname.endsWith('.db')) {
+    // Enhanced file validation
+    const allowedExtensions = ['.sql', '.db'];
+    const allowedMimeTypes = ['application/octet-stream', 'application/sql', 'application/x-sqlite3'];
+    
+    const fileExtension = path.extname(file.originalname).toLowerCase();
+    const isValidExtension = allowedExtensions.includes(fileExtension);
+    const isValidMimeType = allowedMimeTypes.includes(file.mimetype) || 
+                           file.mimetype === 'application/octet-stream';
+    
+    // Check for path traversal attempts
+    if (file.originalname.includes('..') || file.originalname.includes('/') || file.originalname.includes('\\')) {
+      return cb(new Error('Invalid filename: path traversal not allowed'), false);
+    }
+    
+    if (isValidExtension && isValidMimeType) {
       cb(null, true);
     } else {
       cb(new Error('Only .sql and .db files are allowed'), false);
     }
   },
   limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB limit
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+    files: 1 // Only allow one file at a time
   }
 });
 

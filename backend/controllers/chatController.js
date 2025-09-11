@@ -40,11 +40,15 @@ const processChat = async (req, res) => {
     // Check conversation message limits
     await conversationService.checkConversationLimits(chatId);
     
+    // Load conversation history for AI context
+    const conversationHistory = await historyService.getHistoryByConversation(chatId);
+    
     const chatRequest = {
       message: message || (file ? `Create a database from this file: ${file.originalname}` : ''),
       file: file,
       conversation_id: chatId,
-      user_id: userId
+      user_id: userId,
+      conversation_history: conversationHistory
     };
     
 
