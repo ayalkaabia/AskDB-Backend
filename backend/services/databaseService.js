@@ -4,10 +4,10 @@ const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 
-const uploadDatabase = async (filePath, fileName) => {
+const uploadDatabase = async (filePath, fileName, userId) => {
   try {
-    // Store database information
-    const dbInfo = await databaseRepo.storeDatabaseInfo(filePath, fileName);
+    // Store database information with user association
+    const dbInfo = await databaseRepo.storeDatabaseInfo(filePath, fileName, userId);
     
     // Move file to permanent location
     const uploadsDir = path.join(__dirname, '../../uploads');
@@ -31,6 +31,15 @@ const uploadDatabase = async (filePath, fileName) => {
 const getAllDatabases = async (limit = 50, offset = 0, status = null) => {
   return await databaseRepo.getAllDatabases(limit, offset, status);
 };
+
+const getUserDatabases = async (userId, limit = 50, offset = 0) => {
+  return await databaseRepo.getUserDatabases(userId, limit, offset);
+};
+
+const getDatabaseById = async (id) => {
+  return await databaseRepo.getDatabaseById(id);
+};
+
 
 const createDatabase = async (databaseData) => {
   try {
@@ -68,9 +77,7 @@ const createDatabase = async (databaseData) => {
   }
 };
 
-const getDatabaseById = async (id) => {
-  return await databaseRepo.getDatabaseById(id);
-};
+
 
 const getDatabaseSchema = async (id) => {
   try {
@@ -271,6 +278,7 @@ const listServerDatabases = async () => {
 module.exports = {
   uploadDatabase,
   getAllDatabases,
+  getUserDatabases,
   createDatabase,
   getDatabaseById,
   getDatabaseSchema,

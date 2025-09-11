@@ -3,7 +3,7 @@
 const jwt = require('jsonwebtoken');
 const { findUserById } = require('../repos/userRepo');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 const auth = async (req, res, next) => {
   try {

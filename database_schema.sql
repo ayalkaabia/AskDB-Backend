@@ -1,7 +1,7 @@
 -- AskDB Database Schema
 -- This file contains all the tables needed for the expanded system
 
--- Users table for authentication
+-- Users table for authentication (created first since other tables reference it)
 CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(36) PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
@@ -11,10 +11,11 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- Databases table (created first to avoid foreign key issues)
-CREATE TABLE IF NOT EXISTS databases (
+-- Databases table
+CREATE TABLE IF NOT EXISTS `databases` (
     id VARCHAR(36) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
+    user_id VARCHAR(36) NOT NULL,
+    name VARCHAR(255) NOT NULL,
     description TEXT,
     type ENUM('mysql', 'postgresql', 'oracle') DEFAULT 'mysql',
     connection_string TEXT,
@@ -25,12 +26,27 @@ CREATE TABLE IF NOT EXISTS databases (
     collation VARCHAR(50) DEFAULT 'utf8mb4_unicode_ci',
     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_user_database_name (user_id, name)
 );
 
--- Enhanced query history table
+-- Conversations table for user-specific chats
+CREATE TABLE IF NOT EXISTS conversations (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    title VARCHAR(255),
+    last_message_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Enhanced query history table with user and conversation associations
 CREATE TABLE IF NOT EXISTS query_history (
     id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36),
+    conversation_id VARCHAR(36),
     prompt TEXT,
     sql_query TEXT NOT NULL,
     results JSON,
@@ -40,7 +56,9 @@ CREATE TABLE IF NOT EXISTS query_history (
     query_type ENUM('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER', 'OTHER') DEFAULT 'SELECT',
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (database_id) REFERENCES databases(id) ON DELETE SET NULL
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+    FOREIGN KEY (database_id) REFERENCES `databases`(id) ON DELETE SET NULL
 );
 
 -- Database backups table
@@ -52,7 +70,7 @@ CREATE TABLE IF NOT EXISTS database_backups (
     file_path VARCHAR(500),
     file_size BIGINT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (database_id) REFERENCES databases(id) ON DELETE CASCADE
+    FOREIGN KEY (database_id) REFERENCES `databases`(id) ON DELETE CASCADE
 );
 
 
@@ -62,7 +80,15 @@ CREATE INDEX idx_query_history_prompt ON query_history(prompt(100));
 CREATE INDEX idx_query_history_sql_query ON query_history(sql_query(100));
 CREATE INDEX idx_query_history_database_id ON query_history(database_id);
 CREATE INDEX idx_query_history_query_type ON query_history(query_type);
+CREATE INDEX idx_query_history_user_id ON query_history(user_id);
+CREATE INDEX idx_query_history_conversation_id ON query_history(conversation_id);
 
+-- Conversations table indexes
+CREATE INDEX idx_conversations_user_id ON conversations(user_id);
+CREATE INDEX idx_conversations_last_message_at ON conversations(last_message_at);
+CREATE INDEX idx_conversations_created_at ON conversations(created_at);
+
+CREATE INDEX idx_databases_user_id ON databases(user_id);
 CREATE INDEX idx_databases_status ON databases(status);
 CREATE INDEX idx_databases_type ON databases(type);
 CREATE INDEX idx_databases_uploaded_at ON databases(uploaded_at);

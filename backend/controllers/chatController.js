@@ -1,6 +1,7 @@
 const aiService = require('../services/aiService');
 const historyService = require('../services/historyService');
 const databaseService = require('../services/databaseService');
+const conversationService = require('../services/conversationService');
 const { v4: uuidv4 } = require('uuid');
 
 /**
@@ -13,6 +14,7 @@ const processChat = async (req, res) => {
   try {
     const { message, conversation_id } = req.body;
     const file = req.file; // From multer middleware
+    const userId = req.user.id; // From auth middleware
 
     // Validate input
     if (!message && !file) {
@@ -22,7 +24,21 @@ const processChat = async (req, res) => {
       });
     }
 
-    const chatId = conversation_id || uuidv4();
+    let chatId = conversation_id;
+    let isNewConversation = false;
+
+    // If no conversation_id provided, create a new conversation
+    if (!chatId) {
+      const newConversation = await conversationService.createConversation(userId);
+      chatId = newConversation.id;
+      isNewConversation = true;
+    } else {
+      // Verify the conversation belongs to the user
+      await conversationService.getConversation(chatId, userId);
+    }
+
+    // Check conversation message limits
+    await conversationService.checkConversationLimits(chatId);
     
     const chatRequest = {
       message: message || (file ? `Create a database from this file: ${file.originalname}` : ''),
@@ -39,13 +55,26 @@ const processChat = async (req, res) => {
       });
     }
 
+    // Store in history with user and conversation associations
     await historyService.addToHistory({
+      user_id: userId,
+      conversation_id: chatId,
       prompt: chatRequest.message || 'File upload',
       sql: aiResponse.sql || '',
       results: aiResponse.results || null,
       database_id: aiResponse.database_id || null,
       query_type: aiResponse.query_type || 'OTHER'
     });
+
+    // Update conversation's last message time
+    await conversationService.updateLastMessageTime(chatId);
+
+    // If this is a new conversation, generate title from first message
+    if (isNewConversation && chatRequest.message) {
+      const title = await conversationService.generateTitleFromMessage(chatRequest.message);
+      await conversationService.updateConversationTitle(chatId, userId, title);
+    }
+
     res.status(200).json({
       conversation_id: chatId,
       message: aiResponse.message,
@@ -61,6 +90,14 @@ const processChat = async (req, res) => {
 
   } catch (error) {
     console.error('Chat processing error:', error);
+    
+    if (error.status) {
+      return res.status(error.status).json({
+        error: error.message,
+        message: error.message
+      });
+    }
+    
     res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to process your request',
@@ -72,6 +109,7 @@ const processChat = async (req, res) => {
 const getConversationHistory = async (req, res) => {
   try {
     const { conversation_id } = req.params;
+    const userId = req.user.id;
     
     if (!conversation_id) {
       return res.status(400).json({
@@ -79,6 +117,9 @@ const getConversationHistory = async (req, res) => {
         message: 'Conversation ID is required'
       });
     }
+
+    // Verify the conversation belongs to the user
+    await conversationService.getConversation(conversation_id, userId);
 
     const history = await historyService.getHistoryByConversation(conversation_id);
     
@@ -90,6 +131,14 @@ const getConversationHistory = async (req, res) => {
 
   } catch (error) {
     console.error('Get conversation history error:', error);
+    
+    if (error.status) {
+      return res.status(error.status).json({
+        error: error.message,
+        message: error.message
+      });
+    }
+    
     res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to retrieve conversation history'
@@ -99,7 +148,10 @@ const getConversationHistory = async (req, res) => {
 
 const listConversations = async (req, res) => {
   try {
-    const conversations = await historyService.getAllConversations();
+    const userId = req.user.id;
+    const { limit = 50, offset = 0 } = req.query;
+    
+    const conversations = await conversationService.getUserConversations(userId, limit, offset);
     
     res.status(200).json({
       conversations,

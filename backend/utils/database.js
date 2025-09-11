@@ -58,8 +58,6 @@ const initializeDatabase = async () => {
       )
     `);
 
-    // Users table is now defined in database_schema.sql
-
     connection.release();
     console.log('✅ Database tables initialized');
   } catch (error) {

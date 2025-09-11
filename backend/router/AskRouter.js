@@ -10,6 +10,7 @@ const queryController = require('../controllers/queryController');
 const historyController = require('../controllers/historyController');
 const exportController = require('../controllers/exportController');
 const chatController = require('../controllers/chatController');
+const conversationController = require('../controllers/conversationController');
 const userController = require('../controllers/userController');
 
 
@@ -52,17 +53,36 @@ const upload = multer({
 });
 
 // =============================================================================
-// CHAT ROUTES
+// CHAT ROUTES (Require Authentication)
 // =============================================================================
 
 // POST /chat - Main chat endpoint
-router.post('/chat', upload.single('file'), chatController.processChat);
+router.post('/chat', auth, upload.single('file'), chatController.processChat);
 
 // GET /chat/history/:conversation_id - Get conversation history
-router.get('/chat/history/:conversation_id', chatController.getConversationHistory);
+router.get('/chat/history/:conversation_id', auth, chatController.getConversationHistory);
 
-// GET /chat/conversations - List all conversations
-router.get('/chat/conversations', chatController.listConversations);
+// GET /chat/conversations - List user's conversations
+router.get('/chat/conversations', auth, chatController.listConversations);
+
+// =============================================================================
+// CONVERSATION MANAGEMENT ROUTES (Require Authentication)
+// =============================================================================
+
+// POST /conversations - Create new conversation
+router.post('/conversations', auth, conversationController.createConversation);
+
+// GET /conversations - Get user's conversations
+router.get('/conversations', auth, conversationController.getUserConversations);
+
+// GET /conversations/:id - Get specific conversation
+router.get('/conversations/:id', auth, conversationController.getConversation);
+
+// PUT /conversations/:id - Update conversation title
+router.put('/conversations/:id', auth, conversationController.updateConversationTitle);
+
+// DELETE /conversations/:id - Delete conversation
+router.delete('/conversations/:id', auth, conversationController.deleteConversation);
 
 // =============================================================================
 // API ROUTES
@@ -74,10 +94,17 @@ router.get('/', (req, res) => {
     message: 'AskDB API is running',
     version: '2.0.0',
     endpoints: {
-      // Chat Interface
+      // Chat Interface (Requires Authentication)
       'POST /chat': 'Main chat interface - handles everything',
       'GET /chat/history/:id': 'Get conversation history',
-      'GET /chat/conversations': 'List all conversations',
+      'GET /chat/conversations': 'List user conversations',
+      
+      // Conversation Management (Requires Authentication)
+      'POST /conversations': 'Create new conversation',
+      'GET /conversations': 'Get user conversations',
+      'GET /conversations/:id': 'Get specific conversation',
+      'PUT /conversations/:id': 'Update conversation title',
+      'DELETE /conversations/:id': 'Delete conversation',
       
       // Database Management
       'POST /upload-db': 'Upload a database file',
@@ -128,20 +155,20 @@ router.get('/', (req, res) => {
 // DATABASE MANAGEMENT ROUTES
 // =============================================================================
 
-// POST /upload-db - Upload a database file
-router.post('/upload-db', upload.single('file'), databaseController.uploadDatabase);
+// POST /upload-db - Upload a database file (requires authentication)
+router.post('/upload-db', auth, upload.single('file'), databaseController.uploadDatabase);
 
-// GET /databases - Get all databases
-router.get('/databases', databaseController.getAllDatabases);
+// GET /databases - Get user's databases (requires authentication)
+router.get('/databases', auth, databaseController.getAllDatabases);
 
-// POST /databases - Create a new database
-router.post('/databases', databaseController.createDatabase);
+// POST /databases - Create a new database (requires authentication)
+router.post('/databases', auth, databaseController.createDatabase);
 
-// GET /databases/:id - Get specific database by ID
-router.get('/databases/:id', databaseController.getDatabaseById);
+// GET /databases/:id - Get specific database by ID (requires authentication)
+router.get('/databases/:id', auth, databaseController.getDatabaseById);
 
-// DELETE /databases/:id - Delete specific database
-router.delete('/databases/:id', databaseController.deleteDatabase);
+// DELETE /databases/:id - Delete specific database (requires authentication)
+router.delete('/databases/:id', auth, databaseController.deleteDatabase);
 
 // GET /databases/:id/schema - Get database schema
 router.get('/databases/:id/schema', databaseController.getDatabaseSchema);

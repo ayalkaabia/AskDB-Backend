@@ -3,19 +3,20 @@ const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 
 class DatabaseRepository {
-  async storeDatabaseInfo(filePath, fileName) {
+  async storeDatabaseInfo(filePath, fileName, userId) {
     const connection = await pool.getConnection();
     try {
       const id = uuidv4();
       const fileSize = fs.statSync(filePath).size;
       
       await connection.execute(
-        'INSERT INTO `databases` (id, name, file_path, file_size, status, uploaded_at) VALUES (?, ?, ?, ?, ?, NOW())',
-        [id, fileName, filePath, fileSize, 'active']
+        'INSERT INTO `databases` (id, user_id, name, file_path, file_size, status, uploaded_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
+        [id, userId, fileName, filePath, fileSize, 'active']
       );
       
       return {
         id,
+        user_id: userId,
         name: fileName,
         file_path: filePath,
         file_size: fileSize,
@@ -210,14 +211,57 @@ class DatabaseRepository {
     }
   }
 
-  async getCurrentDatabase() {
+  async getCurrentDatabase(userId) {
     const connection = await pool.getConnection();
     try {
       const [rows] = await connection.execute(
-        'SELECT * FROM `databases` WHERE status = "active" ORDER BY uploaded_at DESC LIMIT 1'
+        'SELECT * FROM `databases` WHERE user_id = ? AND status = "active" ORDER BY uploaded_at DESC LIMIT 1',
+        [userId]
       );
       
       return rows.length > 0 ? rows[0] : null;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async getUserDatabases(userId, limit = 50, offset = 0) {
+    const connection = await pool.getConnection();
+    try {
+      const [rows] = await connection.execute(
+        'SELECT * FROM `databases` WHERE user_id = ? ORDER BY uploaded_at DESC LIMIT ? OFFSET ?',
+        [userId, limit, offset]
+      );
+      
+      return rows;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async getDatabaseById(id, userId) {
+    const connection = await pool.getConnection();
+    try {
+      const [rows] = await connection.execute(
+        'SELECT * FROM `databases` WHERE id = ? AND user_id = ?',
+        [id, userId]
+      );
+      
+      return rows.length > 0 ? rows[0] : null;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async deleteDatabase(id, userId) {
+    const connection = await pool.getConnection();
+    try {
+      const [result] = await connection.execute(
+        'DELETE FROM `databases` WHERE id = ? AND user_id = ?',
+        [id, userId]
+      );
+      
+      return result.affectedRows > 0;
     } finally {
       connection.release();
     }

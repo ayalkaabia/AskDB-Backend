@@ -12,9 +12,11 @@ class HistoryRepository {
       const queryType = this.determineQueryType(queryData.sql);
       
       await connection.execute(
-        'INSERT INTO `query_history` (id, prompt, sql_query, results, result_count, database_id, query_type) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO `query_history` (id, user_id, conversation_id, prompt, sql_query, results, result_count, database_id, query_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           id,
+          queryData.user_id || null,
+          queryData.conversation_id || null,
           queryData.prompt,
           queryData.sql,
           JSON.stringify(queryData.results),
@@ -26,6 +28,8 @@ class HistoryRepository {
       
       return {
         id,
+        user_id: queryData.user_id || null,
+        conversation_id: queryData.conversation_id || null,
         prompt: queryData.prompt,
         sql: queryData.sql,
         results: queryData.results,
@@ -211,7 +215,7 @@ class HistoryRepository {
   }
 
   async getHistoryByConversation(conversationId, limit = 50, offset = 0) {
-    const connection = await this.pool.getConnection();
+    const connection = await pool.getConnection();
     
     try {
       const [rows] = await connection.execute(`
@@ -221,14 +225,17 @@ class HistoryRepository {
         LIMIT ? OFFSET ?
       `, [conversationId, limit, offset]);
       
-      return rows;
+      return rows.map(row => ({
+        ...row,
+        results: row.results ? JSON.parse(row.results) : null
+      }));
     } finally {
       connection.release();
     }
   }
 
   async getAllConversations() {
-    const connection = await this.pool.getConnection();
+    const connection = await pool.getConnection();
     
     try {
       const [rows] = await connection.execute(`

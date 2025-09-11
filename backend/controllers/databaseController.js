@@ -14,6 +14,7 @@ const uploadDatabase = async (req, res) => {
 
     const filePath = req.file.path;
     const fileName = req.file.originalname;
+    const userId = req.user.id; // From auth middleware
     
     // Validate file type
     if (!fileName.endsWith('.sql') && !fileName.endsWith('.db')) {
@@ -25,7 +26,7 @@ const uploadDatabase = async (req, res) => {
       });
     }
 
-    const result = await databaseService.uploadDatabase(filePath, fileName);
+    const result = await databaseService.uploadDatabase(filePath, fileName, userId);
     
     res.status(200).json({
       message: 'Database uploaded successfully',
@@ -56,7 +57,8 @@ const uploadDatabase = async (req, res) => {
 
 const getAllDatabases = async (req, res) => {
   try {
-    const { limit = 50, offset = 0, status } = req.query;
+    const { limit = 50, offset = 0 } = req.query;
+    const userId = req.user.id; // From auth middleware
     
     const limitNum = parseInt(limit);
     const offsetNum = parseInt(offset);
@@ -75,7 +77,7 @@ const getAllDatabases = async (req, res) => {
       });
     }
 
-    const databases = await databaseService.getAllDatabases(limitNum, offsetNum, status);
+    const databases = await databaseService.getUserDatabases(userId, limitNum, offsetNum);
     
     res.status(200).json(databases);
 

@@ -3,6 +3,7 @@
 ## Table of Contents
 - [Base URL](#base-url)
 - [Authentication](#authentication)
+- [Chat System](#chat-system)
 - [Database Management](#database-management)
 - [Query Operations](#query-operations)
 - [History Management](#history-management)
@@ -19,6 +20,162 @@ TBD
 
 ---
 
+## Chat System
+
+The chat system allows users to have multiple conversations with the AI, where each conversation is isolated to the specific user. All chat endpoints require authentication.
+
+### **POST /chat**
+- **Description:** Send a message to the AI or create a new conversation
+- **Authentication:** Required
+- **Request:**
+  ```json
+  {
+    "message": "Show me all users in the database",
+    "conversation_id": "optional-conversation-id"
+  }
+  ```
+- **File Upload:** You can also upload files using `multipart/form-data` (field: `file`, formats: `.db`, `.sql`)
+- **Response (200):**
+  ```json
+  {
+    "conversation_id": "uuid-of-conversation",
+    "message": "AI response message",
+    "data": {
+      "sql": "SELECT * FROM users",
+      "results": [...],
+      "database_id": "database-id",
+      "action_type": "chat"
+    },
+    "success": true,
+    "timestamp": "2024-01-01T12:00:00.000Z"
+  }
+  ```
+
+### **GET /chat/history/:conversation_id**
+- **Description:** Get message history for a specific conversation
+- **Authentication:** Required
+- **Response (200):**
+  ```json
+  {
+    "conversation_id": "uuid-of-conversation",
+    "messages": [
+      {
+        "id": "message-id",
+        "user_id": "user-id",
+        "conversation_id": "conversation-id",
+        "prompt": "User message",
+        "sql_query": "SELECT * FROM users",
+        "results": [...],
+        "query_type": "SELECT",
+        "timestamp": "2024-01-01T12:00:00.000Z"
+      }
+    ],
+    "success": true
+  }
+  ```
+
+### **GET /chat/conversations**
+- **Description:** List all conversations for the authenticated user
+- **Authentication:** Required
+- **Query Params:** `limit` (default: 50), `offset` (default: 0)
+- **Response (200):**
+  ```json
+  {
+    "conversations": [
+      {
+        "id": "conversation-id",
+        "user_id": "user-id",
+        "title": "Database Analysis",
+        "last_message_at": "2024-01-01T12:00:00.000Z",
+        "created_at": "2024-01-01T10:00:00.000Z",
+        "updated_at": "2024-01-01T12:00:00.000Z"
+      }
+    ],
+    "success": true
+  }
+  ```
+
+### **POST /conversations**
+- **Description:** Create a new empty conversation
+- **Authentication:** Required
+- **Request:**
+  ```json
+  {
+    "title": "Optional conversation title"
+  }
+  ```
+- **Response (201):**
+  ```json
+  {
+    "conversation": {
+      "id": "conversation-id",
+      "user_id": "user-id",
+      "title": "New Chat",
+      "created_at": "2024-01-01T12:00:00.000Z",
+      "last_message_at": "2024-01-01T12:00:00.000Z"
+    },
+    "success": true
+  }
+  ```
+
+### **GET /conversations**
+- **Description:** Get user's conversations (same as `/chat/conversations`)
+- **Authentication:** Required
+
+### **GET /conversations/:id**
+- **Description:** Get specific conversation details
+- **Authentication:** Required
+- **Response (200):**
+  ```json
+  {
+    "conversation": {
+      "id": "conversation-id",
+      "user_id": "user-id",
+      "title": "Database Analysis",
+      "last_message_at": "2024-01-01T12:00:00.000Z",
+      "created_at": "2024-01-01T10:00:00.000Z",
+      "updated_at": "2024-01-01T12:00:00.000Z"
+    },
+    "success": true
+  }
+  ```
+
+### **PUT /conversations/:id**
+- **Description:** Update conversation title
+- **Authentication:** Required
+- **Request:**
+  ```json
+  {
+    "title": "New conversation title"
+  }
+  ```
+- **Response (200):**
+  ```json
+  {
+    "success": true,
+    "message": "Conversation title updated successfully"
+  }
+  ```
+
+### **DELETE /conversations/:id**
+- **Description:** Delete a conversation and all its messages
+- **Authentication:** Required
+- **Response (200):**
+  ```json
+  {
+    "success": true,
+    "message": "Conversation deleted successfully"
+  }
+  ```
+
+**Chat System Features:**
+- User-specific conversations (each user sees only their own chats)
+- Auto-generated titles from first message (50 character limit)
+- Conversation limits: 50 conversations per user, 1000 messages per conversation
+- File upload support maintained
+- All operations are user-scoped and secure
+
+---
 
 ## Database Management
 

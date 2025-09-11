@@ -6,9 +6,16 @@ AskDB is a powerful natural language to SQL query system that allows users to in
 
 ### Core Functionality
 - **Natural Language to SQL**: Convert plain English to SQL queries using AI
-- **Multiple Database Support**: Support for SQLite, MySQL, PostgreSQL, and Oracle
+- **Multiple Database Support**: Support for MySQL, PostgreSQL, and Oracle
 - **Query Execution**: Execute both AI-generated and raw SQL queries
 - **Result Export**: Export results in CSV or JSON format
+
+### Chat System (NEW!)
+- **User-Specific Conversations**: Each user has isolated chat sessions
+- **Auto-Generated Titles**: Conversation titles generated from first message
+- **Conversation Management**: Create, update, delete, and list conversations
+- **Message History**: Complete conversation history with timestamps
+- **File Upload Support**: Upload database files through chat interface
 
 ### Enhanced History System
 - **Query History**: Track all queries with timestamps and results
@@ -56,33 +63,40 @@ The system follows a clean, layered architecture:
 ## 📁 Project Structure
 
 ```
-backend/
-├── controllers/          # Request handlers
-│   ├── databaseController.js
-│   ├── historyController.js
-│   ├── permissionController.js
-│   ├── queryController.js
-│   └── userController.js
-├── services/            # Business logic
-│   ├── aiService.js
-│   ├── databaseService.js
-│   ├── historyService.js
-│   ├── permissionService.js
-│   └── userService.js
-├── repos/              # Data access
-│   ├── databaseRepo.js
-│   ├── historyRepo.js
-│   ├── permissionRepo.js
-│   └── userRepo.js
-├── router/             # Route definitions
-│   ├── AskRouter.js
-│   ├── userRouter.js
-│   └── permissionRouter.js
-├── middleware/         # Request processing
-│   ├── validation.js
-│   └── upload.js
-└── utils/             # Utilities
-    └── database.js
+AskDB/
+├── backend/
+│   ├── controllers/          # Request handlers
+│   │   ├── chatController.js
+│   │   ├── conversationController.js
+│   │   ├── databaseController.js
+│   │   ├── historyController.js
+│   │   ├── queryController.js
+│   │   └── userController.js
+│   ├── services/            # Business logic
+│   │   ├── aiService.js
+│   │   ├── conversationService.js
+│   │   ├── databaseService.js
+│   │   ├── historyService.js
+│   │   └── userService.js
+│   ├── repos/              # Data access
+│   │   ├── conversationRepo.js
+│   │   ├── databaseRepo.js
+│   │   ├── historyRepo.js
+│   │   └── userRepo.js
+│   ├── router/             # Route definitions
+│   │   └── AskRouter.js
+│   ├── middleware/         # Request processing
+│   │   ├── auth.js
+│   │   ├── validation.js
+│   │   └── upload.js
+│   └── utils/             # Utilities
+│       └── database.js
+├── docs/                  # Documentation
+├── uploads/              # File uploads directory
+├── database_schema.sql   # Complete database schema
+├── simple_seed.js        # Database setup script
+├── server.js            # Main server file
+└── package.json         # Dependencies
 ```
 
 ## 🚀 Getting Started
@@ -108,6 +122,17 @@ backend/
 3. **Set up environment variables**
    ```bash
    cp env.example .env
+   # Edit .env with your database credentials
+   ```
+
+4. **Set up the database**
+   ```bash
+   npm run seed
+   ```
+
+5. **Start the server**
+   ```bash
+   npm start
    ```
    
    Edit `.env` file:
